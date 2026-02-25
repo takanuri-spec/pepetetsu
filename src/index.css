@@ -53,12 +53,14 @@ button {
   letter-spacing: 0.05em;
   color: var(--accent2);
   text-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+  margin-bottom: 8px;
 }
 
 .lobby-subtitle {
   font-size: 1rem;
   color: var(--text-muted);
-  margin-top: -20px;
+  margin-top: 0;
+  margin-bottom: 24px;
 }
 
 .lobby-card {
