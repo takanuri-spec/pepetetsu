@@ -154,19 +154,30 @@ export function calcAllRoutes(
     currentNodes = nextNodes;
   }
 
+  // 同一の着地地点（landingNodeId）が複数ある場合、重複を除去する
+  const uniqueLandingNodes = new Map<number, number>(); // landingNodeId -> pathIndex
+  currentNodes.forEach((nodeId, idx) => {
+    if (!uniqueLandingNodes.has(nodeId)) {
+      uniqueLandingNodes.set(nodeId, idx);
+    }
+  });
+
   // RouteInfo の生成
-  return paths.map((path, idx) => {
-    const landingNodeId = currentNodes[idx];
+  const result: RouteInfo[] = [];
+  uniqueLandingNodes.forEach((pathIdx, landingNodeId) => {
+    const path = paths[pathIdx];
     const distToDestination = destinationNodeId != null
       ? calcDistanceToNode(landingNodeId, destinationNodeId, map)
       : null;
-    return {
-      id: `route-${idx}`,
+    result.push({
+      id: `route-${landingNodeId}`,
       path,
       landingNodeId,
       distToDestination
-    };
+    });
   });
+
+  return result;
 }
 
 // ========== 物件アクション判定 ==========
