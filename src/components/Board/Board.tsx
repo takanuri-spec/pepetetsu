@@ -87,11 +87,13 @@ export function Board() {
   const nodes = Object.values(map.nodes) as MapNode[];
   const edges = map.edges as MapEdge[];
 
+  const minScale = typeof window !== 'undefined' && window.innerWidth < 768 ? 0.75 : 0.5;
+
   return (
     <>
       <TransformWrapper
         initialScale={1}
-        minScale={0.5}
+        minScale={minScale}
         maxScale={4}
         wheel={{ step: 0.1 }}
         doubleClick={{ disabled: true }}

@@ -145,7 +145,7 @@ export function Modals() {
 
                       {!hasHover && isSelected && (
                         <div style={{ marginTop: 8, padding: '4px 8px', background: 'var(--accent)', color: 'white', borderRadius: 4, fontSize: '0.85rem', fontWeight: 'bold' }}>
-                          もう一度タップで決定
+                          決定
                         </div>
                       )}
                     </button>

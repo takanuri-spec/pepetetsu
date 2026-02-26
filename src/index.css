@@ -176,6 +176,18 @@ button {
   display: flex;
   height: 100vh;
   overflow: hidden;
+  position: relative;
+}
+
+.mobile-sidebar-toggle {
+  display: none;
+}
+
+.sidebar-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  z-index: 50;
 }
 
 .game-board-area {
@@ -189,12 +201,51 @@ button {
 
 .game-sidebar {
   width: 280px;
+  height: 100%;
   background: var(--surface);
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   flex-shrink: 0;
+}
+
+/* ========== Mobile Responsiveness ========== */
+@media (max-width: 768px) {
+  .mobile-sidebar-toggle {
+    display: block;
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 100;
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-weight: bold;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  }
+
+  .sidebar-container {
+    position: absolute;
+    top: 0;
+    right: -320px;
+    height: 100vh;
+    transition: right 0.3s ease;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.5);
+  }
+
+  .sidebar-container.open {
+    right: 0;
+  }
+
+  .mobile-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 40;
+  }
 }
 
 /* ========== Board SVG ========== */
