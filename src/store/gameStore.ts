@@ -45,6 +45,7 @@ export interface StoreState {
   cycleLength: number;
   map: GameMap;
   destinationNodeId: number | null;
+  nextDestinationNodeId: number | null;
   destinationReachCount: number;
   diceValue: number | null;
   movingPath: number[];
@@ -87,6 +88,7 @@ const INITIAL_STATE: Omit<StoreState, 'updateSettings' | 'updateLobbyPlayers' | 
   cycleLength: 4,
   map: GAME_MAP,
   destinationNodeId: null,
+  nextDestinationNodeId: null,
   destinationReachCount: 0,
   diceValue: null,
   movingPath: [],
@@ -229,8 +231,12 @@ export const useGameStore = create<StoreState>((set, get) => ({
     const s = get();
 
     if (s.phase === 'destination_reached') {
-      const newDest = chooseNextDestination(s.destinationNodeId, s.players);
-      set({ destinationNodeId: newDest, destinationReachCount: s.destinationReachCount + 1 });
+      const newDest = s.nextDestinationNodeId ?? chooseNextDestination(s.destinationNodeId, s.players);
+      set({
+        destinationNodeId: newDest,
+        nextDestinationNodeId: null,
+        destinationReachCount: s.destinationReachCount + 1
+      });
 
       // 引き続き物件購入フェーズへ移行するか判定
       const finalNode = s.map.nodes[s.players[s.currentPlayerIndex].position];
@@ -313,7 +319,9 @@ function _handleLanding(set: SetFn, get: GetFn, node: ReturnType<typeof get>['ma
         totalAssets: calcTotalAssets({ ...p, money: p.money + bonus }, s.map),
       };
     });
-    set({ players: updatedPlayers, phase: 'destination_reached' });
+    // 次の目的地を事前に選んでおく
+    const nextDest = chooseNextDestination(s.destinationNodeId, updatedPlayers);
+    set({ players: updatedPlayers, phase: 'destination_reached', nextDestinationNodeId: nextDest });
     return;
   }
 

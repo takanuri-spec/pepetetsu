@@ -100,6 +100,7 @@ export interface GameState {
   cycleLength: number;
   map: GameMap;
   destinationNodeId: number | null;
+  nextDestinationNodeId: number | null;
   destinationReachCount: number; // 目的地到達回数（次の目的地設定用）
   diceValue: number | null;
   movingPath: number[]; // アニメーション用移動経路

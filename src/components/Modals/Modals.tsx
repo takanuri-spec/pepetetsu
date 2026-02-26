@@ -41,6 +41,7 @@ export function Modals() {
     lastSettlement,
     winner,
     destinationNodeId,
+    nextDestinationNodeId,
     diceValue,
     routeInfos,
     buyProperty,
@@ -218,6 +219,15 @@ export function Modals() {
                 </strong>{' '}
                 に到達しました！
                 <span className="modal-price">+¥{settings.destinationBonusAmount.toLocaleString()}</span>
+
+                {nextDestinationNodeId != null && (
+                  <div style={{ marginTop: 24, padding: '16px', background: 'rgba(255,215,0,0.1)', borderRadius: '12px', border: '1px solid rgba(255,215,0,0.3)' }}>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 4 }}>次の目的地は...</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--accent2)' }}>
+                      📍 {map.nodes[nextDestinationNodeId]?.name}
+                    </div>
+                  </div>
+                )}
               </div>
               <button className="btn btn-primary" onClick={acknowledgeAction} style={{ width: '100%' }}>
                 続ける

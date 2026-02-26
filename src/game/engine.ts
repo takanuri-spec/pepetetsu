@@ -305,6 +305,7 @@ export function createInitialGameState(settings: GameSettings, lobbyPlayers: Arr
     cycleLength: settings.cycleLength,
     map: GAME_MAP,
     destinationNodeId: firstDestination,
+    nextDestinationNodeId: null,
     destinationReachCount: 0,
     diceValue: null,
     movingPath: [],
