@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../../store/gameStore';
 import { COLOR_HEX } from '../../game/types';
@@ -15,6 +16,20 @@ const modalVariants = {
 
 export function Modals() {
   const state = useGameStore();
+
+  // Touch UI handling
+  const [hasHover, setHasHover] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches
+  );
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(hover: hover)');
+    const handler = (e: MediaQueryListEvent) => setHasHover(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   if (state.phase === 'lobby') return null;
 
   const {
@@ -58,59 +73,84 @@ export function Modals() {
               )}
             </div>
             <div className="branch-buttons">
-              {routeInfos.map(info => {
-                const landingNode = map.nodes[info.landingNodeId];
-                const midNodes = info.path.slice(1, -1)
-                  .map(id => map.nodes[id])
-                  .filter(Boolean);
-                const isNear = info.distToDestination != null && info.distToDestination <= 4;
-                const isDestination = info.landingNodeId === destinationNodeId;
+              {[...routeInfos]
+                .sort((a, b) => (a.distToDestination ?? Infinity) - (b.distToDestination ?? Infinity))
+                .map(info => {
+                  const landingNode = map.nodes[info.landingNodeId];
+                  const midNodes = info.path.slice(1, -1)
+                    .map(id => map.nodes[id])
+                    .filter(Boolean);
+                  const isNear = info.distToDestination != null && info.distToDestination <= 4;
+                  const isDestination = info.landingNodeId === destinationNodeId;
 
-                return (
-                  <button
-                    key={info.id}
-                    className="btn-branch"
-                    onClick={() => selectRoute(info.id)}
-                    onMouseEnter={() => setHoveredRoute(info.id)}
-                    onMouseLeave={() => setHoveredRoute(null)}
-                  >
-                    <div className="branch-card-name">
-                      {isDestination && <span style={{ marginRight: 4 }}>⭐</span>}
-                      {landingNode?.name ?? `ノード${info.landingNodeId}`}
-                    </div>
+                  const isSelected = selectedRouteId === info.id;
 
-                    <div className="branch-card-type">
-                      {landingNode?.type === 'property' && (
-                        <>🏘️ ¥{landingNode.properties?.reduce((sum, p) => sum + p.price, 0).toLocaleString()} <span style={{ color: '#22c55e' }}>収益¥{landingNode.properties?.reduce((sum, p) => sum + p.baseIncome, 0).toLocaleString()}</span></>
-                      )}
-                      {landingNode?.type === 'bonus' && (
-                        <span style={{ color: '#22c55e' }}>⭐ +¥{landingNode.amount?.toLocaleString()}</span>
-                      )}
-                      {landingNode?.type === 'penalty' && (
-                        <span style={{ color: '#ef4444' }}>💀 -¥{landingNode.amount?.toLocaleString()}</span>
-                      )}
-                      {landingNode?.type === 'start' && (
-                        <span style={{ color: '#ffd700' }}>🏠 スタート</span>
-                      )}
-                    </div>
-
-                    <div className={`branch-card-dist${isNear ? ' near' : ''}`}>
-                      🎯 {isDestination
-                        ? '目的地！'
-                        : info.distToDestination != null
-                          ? `目的地まで ${info.distToDestination} マス`
-                          : '目的地: 遠回り'}
-                    </div>
-
-                    {midNodes.length > 0 && (
-                      <div className="branch-card-via">
-                        経由: {midNodes.slice(0, 3).map(n => n?.name).join(' → ')}
-                        {midNodes.length > 3 && ' …'}
+                  return (
+                    <button
+                      key={info.id}
+                      className={`btn-branch ${isSelected ? 'selected' : ''}`}
+                      onClick={() => {
+                        if (hasHover) {
+                          selectRoute(info.id);
+                        } else {
+                          if (isSelected) {
+                            selectRoute(info.id);
+                          } else {
+                            setSelectedRouteId(info.id);
+                            setHoveredRoute(info.id);
+                          }
+                        }
+                      }}
+                      onMouseEnter={() => {
+                        if (hasHover) setHoveredRoute(info.id);
+                      }}
+                      onMouseLeave={() => {
+                        if (hasHover) setHoveredRoute(null);
+                      }}
+                    >
+                      <div className="branch-card-name">
+                        {isDestination && <span style={{ marginRight: 4 }}>⭐</span>}
+                        {landingNode?.name ?? `ノード${info.landingNodeId}`}
                       </div>
-                    )}
-                  </button>
-                );
-              })}
+
+                      <div className="branch-card-type">
+                        {landingNode?.type === 'property' && (
+                          <>🏘️ ¥{landingNode.properties?.reduce((sum, p) => sum + p.price, 0).toLocaleString()} <span style={{ color: '#22c55e' }}>収益¥{landingNode.properties?.reduce((sum, p) => sum + p.baseIncome, 0).toLocaleString()}</span></>
+                        )}
+                        {landingNode?.type === 'bonus' && (
+                          <span style={{ color: '#22c55e' }}>⭐ +¥{landingNode.amount?.toLocaleString()}</span>
+                        )}
+                        {landingNode?.type === 'penalty' && (
+                          <span style={{ color: '#ef4444' }}>💀 -¥{landingNode.amount?.toLocaleString()}</span>
+                        )}
+                        {landingNode?.type === 'start' && (
+                          <span style={{ color: '#ffd700' }}>🏠 スタート</span>
+                        )}
+                      </div>
+
+                      <div className={`branch-card-dist${isNear ? ' near' : ''}`}>
+                        🎯 {isDestination
+                          ? '目的地！'
+                          : info.distToDestination != null
+                            ? `目的地まで ${info.distToDestination} マス`
+                            : '目的地: 遠回り'}
+                      </div>
+
+                      {midNodes.length > 0 && (
+                        <div className="branch-card-via">
+                          経由: {midNodes.slice(0, 3).map(n => n?.name).join(' → ')}
+                          {midNodes.length > 3 && ' …'}
+                        </div>
+                      )}
+
+                      {!hasHover && isSelected && (
+                        <div style={{ marginTop: 8, padding: '4px 8px', background: 'var(--accent)', color: 'white', borderRadius: 4, fontSize: '0.85rem', fontWeight: 'bold' }}>
+                          もう一度タップで決定
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
             </div>
           </motion.div>
         )}
