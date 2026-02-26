@@ -9,6 +9,21 @@ import { COLOR_HEX } from '../../game/types';
 // SVG座標のスケール（ビューポート900x650に正規化）
 const VIEWBOX = '0 0 900 700';
 
+// 描画設定のトグル（あとで直線を戻せるようにフラグ化）
+export const USE_ORTHOGONAL_LINES = true;
+
+function createOrthogonalPath(x1: number, y1: number, x2: number, y2: number): string {
+  const dx = Math.abs(x2 - x1);
+  const dy = Math.abs(y2 - y1);
+
+  // Xの移動距離の方が長ければX軸を先に、そうでなければY軸を先に移動（L字型を書く）
+  if (dx > dy) {
+    return `M ${x1} ${y1} L ${x2} ${y1} L ${x2} ${y2}`;
+  } else {
+    return `M ${x1} ${y1} L ${x1} ${y2} L ${x2} ${y2}`;
+  }
+}
+
 const NODE_RADIUS: Record<string, number> = {
   start: 16,
   property: 14,
@@ -282,6 +297,25 @@ export function Board() {
                   if (!from || !to) return null;
                   // ホバー中経路のエッジをハイライト
                   const isHoveredEdge = hoveredEdgeSet.has(`${edge.from}-${edge.to}`);
+
+                  const strokeColor = isHoveredEdge ? 'rgba(0,255,255,0.8)' : 'rgba(255,255,255,0.4)';
+                  const strokeWidth = isHoveredEdge ? 3 : 2;
+                  const strokeDasharray = isHoveredEdge ? 'none' : '6 4';
+
+                  if (USE_ORTHOGONAL_LINES) {
+                    return (
+                      <path
+                        key={i}
+                        d={createOrthogonalPath(from.x, from.y, to.x, to.y)}
+                        fill="none"
+                        stroke={strokeColor}
+                        strokeWidth={strokeWidth}
+                        strokeDasharray={strokeDasharray}
+                        style={{ pointerEvents: 'none' }}
+                      />
+                    );
+                  }
+
                   return (
                     <line
                       key={i}
@@ -289,9 +323,9 @@ export function Board() {
                       y1={from.y}
                       x2={to.x}
                       y2={to.y}
-                      stroke={isHoveredEdge ? 'rgba(0,255,255,0.8)' : 'rgba(255,255,255,0.4)'}
-                      strokeWidth={isHoveredEdge ? 3 : 2}
-                      strokeDasharray={isHoveredEdge ? 'none' : '6 4'}
+                      stroke={strokeColor}
+                      strokeWidth={strokeWidth}
+                      strokeDasharray={strokeDasharray}
                       style={{ pointerEvents: 'none' }}
                     />
                   );
