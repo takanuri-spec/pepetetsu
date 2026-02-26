@@ -84,11 +84,14 @@ export interface SettlementInfo {
 }
 
 export interface GameSettings {
+  gameMode: 'classic' | 'treasure';
   playerCount: number;
   totalRounds: number;
   cycleLength: number; // 何ラウンドで1決算（デフォルト4）
   startingMoney: number;
   destinationBonusAmount: number;
+  targetTreasures: number;
+  treasureMapId: string;
 }
 
 export interface GameState {
@@ -138,9 +141,12 @@ export const COLOR_HEX: Record<PlayerColor, string> = {
 };
 
 export const DEFAULT_SETTINGS: GameSettings = {
+  gameMode: 'classic',
   playerCount: 2,
   totalRounds: 20,
   cycleLength: 4,
   startingMoney: 1000,
   destinationBonusAmount: 500,
+  targetTreasures: 10,
+  treasureMapId: 'five_islands',
 };

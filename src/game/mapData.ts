@@ -21,56 +21,56 @@ export const GROUP_BONUS_MULTIPLIER = 1.5;
 
 const rawNodes: Array<Omit<MapNode, 'properties'> & { price?: number; baseIncome?: number }> = [
   // ----- スタート -----
-  { id: 0, name: 'スタート', type: 'start', x: 720, y: 480, next: [7, 8] },
+  { id: 0, name: 'スタート', type: 'start', x: 1395, y: 749, next: [7, 8] },
 
   // ----- 北海道 -----
-  { id: 1, name: '札幌', type: 'property', x: 820, y: 80, next: [2], price: 400, baseIncome: 40, groupId: 'hokkaido', color: '#60A5FA' },
-  { id: 2, name: '函館', type: 'property', x: 760, y: 160, next: [3], price: 300, baseIncome: 30, groupId: 'hokkaido', color: '#60A5FA' },
+  { id: 1, name: '札幌', type: 'property', x: 1456, y: -187, next: [2], price: 400, baseIncome: 40, groupId: 'hokkaido', color: '#60A5FA' },
+  { id: 2, name: '函館', type: 'property', x: 1356, y: -61, next: [3], price: 300, baseIncome: 30, groupId: 'hokkaido', color: '#60A5FA' },
 
   // ----- 東北 -----
-  { id: 3, name: '青森', type: 'property', x: 740, y: 220, next: [4, 5], price: 250, baseIncome: 25, groupId: 'tohoku', color: '#34D399' },
-  { id: 4, name: '仙台', type: 'property', x: 720, y: 280, next: [5, 6], price: 350, baseIncome: 35, groupId: 'tohoku', color: '#34D399' },
-  { id: 5, name: '山形', type: 'bonus', x: 660, y: 270, next: [6, 17], amount: 150 },
-  { id: 6, name: '福島', type: 'property', x: 700, y: 340, next: [11, 17], price: 280, baseIncome: 28, groupId: 'tohoku', color: '#34D399' },
+  { id: 3, name: '青森', type: 'property', x: 1250, y: 61, next: [4, 5], price: 250, baseIncome: 25, groupId: 'tohoku', color: '#34D399' },
+  { id: 4, name: '仙台', type: 'property', x: 1301, y: 147, next: [5, 6], price: 350, baseIncome: 35, groupId: 'tohoku', color: '#34D399' },
+  { id: 5, name: '山形', type: 'bonus', x: 1145, y: 186, next: [6, 17], amount: 150 },
+  { id: 6, name: '福島', type: 'property', x: 1198, y: 270, next: [11, 17], price: 280, baseIncome: 28, groupId: 'tohoku', color: '#34D399' },
 
   // ----- 関東 -----
-  { id: 7, name: '東京', type: 'property', x: 720, y: 400, next: [8], price: 600, baseIncome: 60, groupId: 'kanto', color: '#F87171' },
-  { id: 8, name: '横浜', type: 'property', x: 700, y: 460, next: [14], price: 550, baseIncome: 55, groupId: 'kanto', color: '#F87171' },
-  { id: 9, name: '千葉', type: 'penalty', x: 770, y: 430, next: [7, 10], amount: -150 },
-  { id: 10, name: '埼玉', type: 'property', x: 760, y: 370, next: [7, 11, 12], price: 400, baseIncome: 40, groupId: 'kanto', color: '#F87171' },
-  { id: 11, name: '宇都宮', type: 'property', x: 720, y: 330, next: [], price: 320, baseIncome: 32, groupId: 'kanto', color: '#F87171' },
-  { id: 12, name: '前橋', type: 'bonus', x: 660, y: 350, next: [16], amount: 200 },
+  { id: 7, name: '東京', type: 'property', x: 1385, y: 602, next: [8], price: 600, baseIncome: 60, groupId: 'kanto', color: '#F87171' },
+  { id: 8, name: '横浜', type: 'property', x: 1248, y: 685, next: [14], price: 550, baseIncome: 55, groupId: 'kanto', color: '#F87171' },
+  { id: 9, name: '千葉', type: 'penalty', x: 1512, y: 548, next: [7, 10], amount: -150 },
+  { id: 10, name: '埼玉', type: 'property', x: 1392, y: 442, next: [7, 11, 12], price: 400, baseIncome: 40, groupId: 'kanto', color: '#F87171' },
+  { id: 11, name: '宇都宮', type: 'property', x: 1358, y: 285, next: [], price: 320, baseIncome: 32, groupId: 'kanto', color: '#F87171' },
+  { id: 12, name: '前橋', type: 'bonus', x: 1233, y: 420, next: [16], amount: 200 },
 
   // ----- 中部 -----
-  { id: 13, name: '名古屋', type: 'property', x: 620, y: 420, next: [19, 21], price: 500, baseIncome: 50, groupId: 'chubu', color: '#FBBF24' },
-  { id: 14, name: '静岡', type: 'property', x: 680, y: 480, next: [13], price: 380, baseIncome: 38, groupId: 'chubu', color: '#FBBF24' },
-  { id: 15, name: '金沢', type: 'property', x: 580, y: 330, next: [19], price: 360, baseIncome: 36, groupId: 'chubu', color: '#FBBF24' },
-  { id: 16, name: '長野', type: 'penalty', x: 640, y: 360, next: [13, 15, 17], amount: -200 },
-  { id: 17, name: '新潟', type: 'property', x: 640, y: 290, next: [15], price: 300, baseIncome: 30, groupId: 'chubu', color: '#FBBF24' },
+  { id: 13, name: '名古屋', type: 'property', x: 956, y: 557, next: [19, 21], price: 500, baseIncome: 50, groupId: 'chubu', color: '#FBBF24' },
+  { id: 14, name: '静岡', type: 'property', x: 1096, y: 635, next: [13], price: 380, baseIncome: 38, groupId: 'chubu', color: '#FBBF24' },
+  { id: 15, name: '金沢', type: 'property', x: 921, y: 425, next: [19], price: 360, baseIncome: 36, groupId: 'chubu', color: '#FBBF24' },
+  { id: 16, name: '長野', type: 'penalty', x: 1077, y: 452, next: [13, 15, 17], amount: -200 },
+  { id: 17, name: '新潟', type: 'property', x: 1043, y: 314, next: [15], price: 300, baseIncome: 30, groupId: 'chubu', color: '#FBBF24' },
 
   // ----- 近畿 -----
-  { id: 18, name: '大阪', type: 'property', x: 540, y: 450, next: [20, 21, 22], price: 580, baseIncome: 58, groupId: 'kinki', color: '#A78BFA' },
-  { id: 19, name: '京都', type: 'property', x: 560, y: 410, next: [18, 20, 32], price: 520, baseIncome: 52, groupId: 'kinki', color: '#A78BFA' },
-  { id: 20, name: '神戸', type: 'property', x: 510, y: 460, next: [23, 24], price: 460, baseIncome: 46, groupId: 'kinki', color: '#A78BFA' },
-  { id: 21, name: '奈良', type: 'bonus', x: 570, y: 470, next: [22], amount: 100 },
-  { id: 22, name: '和歌山', type: 'property', x: 550, y: 510, next: [], price: 280, baseIncome: 28, groupId: 'kinki', color: '#A78BFA' },
+  { id: 18, name: '大阪', type: 'property', x: 785, y: 694, next: [20, 21, 22], price: 580, baseIncome: 58, groupId: 'kinki', color: '#A78BFA' },
+  { id: 19, name: '京都', type: 'property', x: 798, y: 535, next: [18, 20, 32], price: 520, baseIncome: 52, groupId: 'kinki', color: '#A78BFA' },
+  { id: 20, name: '神戸', type: 'property', x: 692, y: 659, next: [23, 24], price: 460, baseIncome: 46, groupId: 'kinki', color: '#A78BFA' },
+  { id: 21, name: '奈良', type: 'bonus', x: 909, y: 709, next: [22], amount: 100 },
+  { id: 22, name: '和歌山', type: 'property', x: 822, y: 843, next: [], price: 280, baseIncome: 28, groupId: 'kinki', color: '#A78BFA' },
 
   // ----- 中国・四国 -----
-  { id: 23, name: '広島', type: 'property', x: 460, y: 470, next: [25, 33], price: 420, baseIncome: 42, groupId: 'chugoku_shikoku', color: '#F472B6' },
-  { id: 24, name: '高松', type: 'property', x: 480, y: 530, next: [25, 26], price: 320, baseIncome: 32, groupId: 'chugoku_shikoku', color: '#F472B6' },
-  { id: 25, name: '松山', type: 'penalty', x: 430, y: 540, next: [], amount: -100 },
-  { id: 26, name: '高知', type: 'property', x: 460, y: 590, next: [25], price: 280, baseIncome: 28, groupId: 'chugoku_shikoku', color: '#F472B6' },
+  { id: 23, name: '広島', type: 'property', x: 557, y: 747, next: [25, 33], price: 420, baseIncome: 42, groupId: 'chugoku_shikoku', color: '#F472B6' },
+  { id: 24, name: '高松', type: 'property', x: 615, y: 801, next: [25, 26], price: 320, baseIncome: 32, groupId: 'chugoku_shikoku', color: '#F472B6' },
+  { id: 25, name: '松山', type: 'penalty', x: 481, y: 888, next: [], amount: -100 },
+  { id: 26, name: '高知', type: 'property', x: 559, y: 950, next: [25], price: 280, baseIncome: 28, groupId: 'chugoku_shikoku', color: '#F472B6' },
 
   // ----- 九州・沖縄 -----
-  { id: 27, name: '福岡', type: 'property', x: 340, y: 520, next: [28], price: 480, baseIncome: 48, groupId: 'kyushu', color: '#FB923C' },
-  { id: 28, name: '熊本', type: 'property', x: 330, y: 570, next: [29], price: 350, baseIncome: 35, groupId: 'kyushu', color: '#FB923C' },
-  { id: 29, name: '鹿児島', type: 'bonus', x: 340, y: 630, next: [30], amount: 200 },
-  { id: 30, name: '那覇', type: 'property', x: 200, y: 660, next: [], price: 380, baseIncome: 38, groupId: 'kyushu', color: '#FB923C' },
+  { id: 27, name: '福岡', type: 'property', x: 277, y: 905, next: [28], price: 480, baseIncome: 48, groupId: 'kyushu', color: '#FB923C' },
+  { id: 28, name: '熊本', type: 'property', x: 153, y: 1010, next: [29], price: 350, baseIncome: 35, groupId: 'kyushu', color: '#FB923C' },
+  { id: 29, name: '鹿児島', type: 'bonus', x: 35, y: 1119, next: [30], amount: 200 },
+  { id: 30, name: '那覇', type: 'property', x: -79, y: 1233, next: [], price: 380, baseIncome: 38, groupId: 'kyushu', color: '#FB923C' },
 
   // ----- 追加分岐ノード -----
-  { id: 31, name: '松江', type: 'property', x: 420, y: 420, next: [33], price: 260, baseIncome: 26, groupId: 'chugoku_shikoku', color: '#F472B6' },
-  { id: 32, name: '鳥取', type: 'bonus', x: 450, y: 380, next: [31], amount: 150 },
-  { id: 33, name: '山口', type: 'property', x: 390, y: 470, next: [27], price: 300, baseIncome: 30, groupId: 'chugoku_shikoku', color: '#F472B6' },
+  { id: 31, name: '松江', type: 'property', x: 511, y: 683, next: [33], price: 260, baseIncome: 26, groupId: 'chugoku_shikoku', color: '#F472B6' },
+  { id: 32, name: '鳥取', type: 'bonus', x: 647, y: 595, next: [31], amount: 150 },
+  { id: 33, name: '山口', type: 'property', x: 406, y: 806, next: [27], price: 300, baseIncome: 30, groupId: 'chugoku_shikoku', color: '#F472B6' },
 ];
 
 const nodes: MapNode[] = rawNodes.map(raw => {

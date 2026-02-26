@@ -1,6 +1,7 @@
 import { useGameStore } from '../../store/gameStore';
 import type { LobbyPlayer } from '../../game/types';
 import { PLAYER_COLORS, COLOR_LABELS, COLOR_HEX } from '../../game/types';
+import { TREASURE_MAPS } from '../../game/treasureMaps';
 
 const DICE_EMOJI = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 
@@ -100,54 +101,111 @@ export function Lobby() {
       <div className="lobby-card">
         <h2>ゲーム設定</h2>
         <div className="lobby-settings-grid">
-          <div className="lobby-settings-item">
-            <label>総ラウンド数</label>
-            <select
-              className="lobby-select"
-              value={settings.totalRounds}
-              onChange={e => updateSettings({ totalRounds: Number(e.target.value) })}
-            >
-              <option value={12}>12（短い）</option>
-              <option value={20}>20（標準）</option>
-              <option value={30}>30（長い）</option>
-            </select>
+          <div className="lobby-settings-item" style={{ gridColumn: '1 / -1' }}>
+            <label>ゲームモード</label>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+              <button
+                className={`btn ${settings.gameMode === 'classic' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => updateSettings({ gameMode: 'classic' })}
+                style={{ flex: 1 }}
+              >
+                🏢 物件・資産（クラシック）
+              </button>
+              <button
+                className={`btn ${settings.gameMode === 'treasure' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => updateSettings({ gameMode: 'treasure' })}
+                style={{ flex: 1 }}
+              >
+                🏴‍☠️ お宝争奪戦（新モード）
+              </button>
+            </div>
           </div>
-          <div className="lobby-settings-item">
-            <label>決算サイクル</label>
-            <select
-              className="lobby-select"
-              value={settings.cycleLength}
-              onChange={e => updateSettings({ cycleLength: Number(e.target.value) })}
-            >
-              <option value={4}>4ラウンドごと</option>
-              <option value={3}>3ラウンドごと</option>
-              <option value={5}>5ラウンドごと</option>
-            </select>
-          </div>
-          <div className="lobby-settings-item">
-            <label>初期所持金</label>
-            <select
-              className="lobby-select"
-              value={settings.startingMoney}
-              onChange={e => updateSettings({ startingMoney: Number(e.target.value) })}
-            >
-              <option value={800}>800（厳しめ）</option>
-              <option value={1000}>1000（標準）</option>
-              <option value={1500}>1500（ゆとり）</option>
-            </select>
-          </div>
-          <div className="lobby-settings-item">
-            <label>目的地ボーナス</label>
-            <select
-              className="lobby-select"
-              value={settings.destinationBonusAmount}
-              onChange={e => updateSettings({ destinationBonusAmount: Number(e.target.value) })}
-            >
-              <option value={300}>300（少なめ）</option>
-              <option value={500}>500（標準）</option>
-              <option value={800}>800（大きめ）</option>
-            </select>
-          </div>
+          {settings.gameMode === 'classic' && (
+            <>
+              <div className="lobby-settings-item">
+                <label>総ラウンド数</label>
+                <select
+                  className="lobby-select"
+                  value={settings.totalRounds}
+                  onChange={e => updateSettings({ totalRounds: Number(e.target.value) })}
+                >
+                  <option value={12}>12（短い）</option>
+                  <option value={20}>20（標準）</option>
+                  <option value={30}>30（長い）</option>
+                </select>
+              </div>
+              <div className="lobby-settings-item">
+                <label>決算サイクル</label>
+                <select
+                  className="lobby-select"
+                  value={settings.cycleLength}
+                  onChange={e => updateSettings({ cycleLength: Number(e.target.value) })}
+                >
+                  <option value={4}>4ラウンドごと</option>
+                  <option value={3}>3ラウンドごと</option>
+                  <option value={5}>5ラウンドごと</option>
+                </select>
+              </div>
+              <div className="lobby-settings-item">
+                <label>初期所持金</label>
+                <select
+                  className="lobby-select"
+                  value={settings.startingMoney}
+                  onChange={e => updateSettings({ startingMoney: Number(e.target.value) })}
+                >
+                  <option value={800}>800（厳しめ）</option>
+                  <option value={1000}>1000（標準）</option>
+                  <option value={1500}>1500（ゆとり）</option>
+                </select>
+              </div>
+              <div className="lobby-settings-item">
+                <label>目的地ボーナス</label>
+                <select
+                  className="lobby-select"
+                  value={settings.destinationBonusAmount}
+                  onChange={e => updateSettings({ destinationBonusAmount: Number(e.target.value) })}
+                >
+                  <option value={300}>300（少なめ）</option>
+                  <option value={500}>500（標準）</option>
+                  <option value={800}>800（大きめ）</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          {settings.gameMode === 'treasure' && (
+            <>
+              <div className="lobby-settings-item">
+                <label>マップ選択</label>
+                <select
+                  className="lobby-select"
+                  value={settings.treasureMapId}
+                  onChange={e => updateSettings({ treasureMapId: e.target.value })}
+                >
+                  {TREASURE_MAPS.map(m => (
+                    <option key={m.id} value={m.id}>{m.emoji} {m.name}</option>
+                  ))}
+                </select>
+                <div style={{ fontSize: '0.85rem', color: '#aaa', marginTop: 4 }}>
+                  {TREASURE_MAPS.find(m => m.id === settings.treasureMapId)?.description}
+                </div>
+              </div>
+              <div className="lobby-settings-item">
+                <label>目標お宝個数</label>
+                <select
+                  className="lobby-select"
+                  value={settings.targetTreasures}
+                  onChange={e => updateSettings({ targetTreasures: Number(e.target.value) })}
+                >
+                  <option value={5}>5個（短い）</option>
+                  <option value={10}>10個（標準）</option>
+                  <option value={15}>15個（長い）</option>
+                  <option value={20}>20個（激闘）</option>
+                  <option value={999}>上限なし（全マス掘り尽くすまで）</option>
+                </select>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
