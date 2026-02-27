@@ -5,7 +5,8 @@ import type { TreasureGameState } from '../game/treasureTypes';
 import { GAME_MAP } from '../game/mapData';
 import type { RouteInfo } from '../game/engine';
 import { calcAllRoutes, rollDice } from '../game/engine';
-import { createInitialTreasureState, _handleTreasureRouteSelection, _acknowledgeMining, _acknowledgeSteal, _acknowledgeCard, _useCard } from '../game/treasureEngine';
+import { createInitialTreasureState, _handleTreasureRouteSelection, _acknowledgeMining, _acknowledgeSteal, _acknowledgeCard, _useCard, _setupCardNodeSelection, _confirmCardNodeSelection } from '../game/treasureEngine';
+import { useGameStore } from './gameStore';
 
 // ========== Store Interface ==========
 
@@ -30,19 +31,25 @@ export interface TreasureStoreState extends TreasureGameState {
     acknowledgeSteal: () => void;
     acknowledgeCard: () => void;
     useCard: (cardId: string, targetPlayerId?: string) => void;
+    setupCardNodeSelection: (cardId: string, actionType: 'blow_away' | 'time_machine', targetPlayerId?: string) => void;
+    confirmCardNodeSelection: (nodeId: number) => void;
+    cancelCardSelection: () => void;
     resetGame: () => void;
 }
 
 // ========== Initial State ==========
 
 // Extract the required properties from TreasureGameState that we'll initialize below.
-type InitialStateSubset = Omit<TreasureStoreState, 'updateLobbyPlayers' | 'updateSettings' | 'startGame' | 'rollDiceAction' | 'selectRoute' | 'setHoveredRoute' | 'acknowledgeMining' | 'acknowledgeSteal' | 'acknowledgeCard' | 'useCard' | 'resetGame'>;
+type InitialStateSubset = Omit<TreasureStoreState, 'updateLobbyPlayers' | 'updateSettings' | 'startGame' | 'rollDiceAction' | 'selectRoute' | 'setHoveredRoute' | 'acknowledgeMining' | 'acknowledgeSteal' | 'acknowledgeCard' | 'useCard' | 'setupCardNodeSelection' | 'confirmCardNodeSelection' | 'cancelCardSelection' | 'resetGame'>;
 
 const INITIAL_STATE: InitialStateSubset = {
     phase: 'playing', // Starts immediately as playing or lobby via App.tsx logic
     settings: { ...DEFAULT_SETTINGS, gameMode: 'treasure' },
     lobbyPlayers: [
-        { name: 'プレイヤー1', color: 'red' as PlayerColor, isHuman: true }
+        { name: 'プレイヤー1', color: 'red' as PlayerColor, isHuman: true },
+        { name: 'CPU1', color: 'blue' as PlayerColor, isHuman: false },
+        { name: 'CPU2', color: 'green' as PlayerColor, isHuman: false },
+        { name: 'CPU3', color: 'yellow' as PlayerColor, isHuman: false },
     ],
     players: [],
     currentPlayerIndex: 0,
@@ -53,6 +60,7 @@ const INITIAL_STATE: InitialStateSubset = {
     currentMiningResult: null,
     currentStealBattle: null,
     currentCardResult: null,
+    pendingCardAction: null,
     diceValue: null,
     movingPath: [],
     winner: null,
@@ -62,6 +70,8 @@ const INITIAL_STATE: InitialStateSubset = {
     isAnimating: false,
     isRollingDice: false,
     rollingDiceDisplay: null,
+    pendingMovement: null,
+    pendingStealTargetId: null,
 };
 
 export const useTreasureStore = create<TreasureStoreState>((set, get) => ({
@@ -137,7 +147,20 @@ export const useTreasureStore = create<TreasureStoreState>((set, get) => ({
         _useCard(set, get, cardId, targetPlayerId);
     },
 
+    setupCardNodeSelection: (cardId, actionType, targetPlayerId) => {
+        _setupCardNodeSelection(set, get, cardId, actionType, targetPlayerId);
+    },
+
+    confirmCardNodeSelection: (nodeId: number) => {
+        _confirmCardNodeSelection(set, get, nodeId);
+    },
+
+    cancelCardSelection: () => {
+        set({ phase: 'playing', pendingCardAction: null });
+    },
+
     resetGame: () => {
         set({ ...INITIAL_STATE });
+        useGameStore.getState().resetGame();
     },
 }));

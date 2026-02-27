@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTreasureStore } from '../../store/treasureStore';
 import { COLOR_HEX } from '../../game/types';
@@ -20,7 +20,6 @@ export function TreasureModals() {
         phase,
         players,
         currentPlayerIndex,
-        map,
         currentMiningResult,
         currentStealBattle,
         currentCardResult,
@@ -29,10 +28,6 @@ export function TreasureModals() {
         acknowledgeCard,
         winner,
         resetGame,
-        diceValue,
-        routeInfos,
-        selectRoute,
-        setHoveredRoute
     } = state;
 
     const currentPlayer = players[currentPlayerIndex];
@@ -63,103 +58,9 @@ export function TreasureModals() {
         }
     }, [phase, isCpuTurn, currentCardResult, acknowledgeCard]);
 
-    // Touch UI handling
-    const [hasHover, setHasHover] = useState(() =>
-        typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches
-    );
-    const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
-
-    useEffect(() => {
-        const mq = window.matchMedia('(hover: hover)');
-        const handler = (e: MediaQueryListEvent) => setHasHover(e.matches);
-        mq.addEventListener('change', handler);
-        return () => mq.removeEventListener('change', handler);
-    }, []);
-
     return (
         <>
-            {/* Route Selection */}
-            <AnimatePresence>
-                {phase === 'route_selection' && (
-                    <motion.div
-                        className="branch-panel"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 20 }}
-                    >
-                        <div className="branch-header">
-                            <div className="branch-title">🗺️ ルート決定 — どこへ進む？</div>
-                            {diceValue != null && (
-                                <div className="branch-dice">🎲 {diceValue} マス進む</div>
-                            )}
-                        </div>
-                        <div className="branch-buttons">
-                            {[...routeInfos].map(info => {
-                                const landingNode = map.nodes[info.landingNodeId];
-                                const midNodes = info.path.slice(1, -1)
-                                    .map(id => map.nodes[id])
-                                    .filter(Boolean);
 
-                                const isSelected = selectedRouteId === info.id;
-
-                                return (
-                                    <button
-                                        key={info.id}
-                                        className={`btn-branch ${isSelected ? 'selected' : ''}`}
-                                        onClick={() => {
-                                            if (hasHover) {
-                                                selectRoute(info.id);
-                                            } else {
-                                                if (isSelected) {
-                                                    selectRoute(info.id);
-                                                } else {
-                                                    setSelectedRouteId(info.id);
-                                                    setHoveredRoute(info.id);
-                                                }
-                                            }
-                                        }}
-                                        onMouseEnter={() => {
-                                            if (hasHover) setHoveredRoute(info.id);
-                                        }}
-                                        onMouseLeave={() => {
-                                            if (hasHover) setHoveredRoute(null);
-                                        }}
-                                    >
-                                        <div className="branch-card-name">
-                                            {landingNode?.name ?? `ノード${info.landingNodeId}`}
-                                        </div>
-
-                                        <div className="branch-card-type">
-                                            {landingNode?.type === 'bonus' && (
-                                                <span style={{ color: '#3b82f6' }}>🃏 カードマス</span>
-                                            )}
-                                            {landingNode?.type === 'start' && (
-                                                <span style={{ color: '#ffd700' }}>🏠 スタート</span>
-                                            )}
-                                            {(!landingNode || (landingNode.type !== 'bonus' && landingNode.type !== 'start')) && (
-                                                <span style={{ color: '#aaa' }}>🪨 採掘マス</span>
-                                            )}
-                                        </div>
-
-                                        {midNodes.length > 0 && (
-                                            <div className="branch-card-via">
-                                                経由: {midNodes.slice(0, 3).map(n => n?.name).join(' → ')}
-                                                {midNodes.length > 3 && ' …'}
-                                            </div>
-                                        )}
-
-                                        {!hasHover && isSelected && (
-                                            <div style={{ marginTop: 8, padding: '4px 8px', background: 'var(--accent)', color: 'white', borderRadius: 4, fontSize: '0.85rem', fontWeight: 'bold' }}>
-                                                決定
-                                            </div>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
 
             {/* Mining Result Modal */}
             <AnimatePresence>
@@ -189,7 +90,11 @@ export function TreasureModals() {
                                     <span style={{ fontSize: '1.4rem', color: 'gold', fontWeight: 'bold' }}>レアなお宝を発見！ (所持数 +2)</span>
                                 )}
                                 {currentMiningResult.type === 'trap' && (
-                                    <span style={{ fontSize: '1.4rem', color: '#ef4444', fontWeight: 'bold' }}>罠にかかった... (所持数 -1)</span>
+                                    <span style={{ fontSize: '1.4rem', color: '#ef4444', fontWeight: 'bold' }}>
+                                        {currentPlayer?.treasures === 0
+                                            ? "罠にかかったが、元々お宝を持っていなかった..."
+                                            : "罠にかかった... (所持数 -1)"}
+                                    </span>
                                 )}
                                 {currentMiningResult.type === 'empty' && (
                                     <span style={{ fontSize: '1.2rem', color: '#888' }}>ここはすでに掘り尽くされている...</span>
@@ -244,7 +149,12 @@ export function TreasureModals() {
                                             )}
                                             {!currentStealBattle.substituteUsed && currentStealBattle.isCounter && (
                                                 <span style={{ fontSize: '1.4rem', color: '#ef4444', fontWeight: 'bold', display: 'inline-block', marginTop: 8 }}>
-                                                    返り討ち！<br /><span style={{ fontSize: '1.1rem', color: '#fff', fontWeight: 'normal' }}>{target.name}に反撃され、お宝を1つ奪われた！</span>
+                                                    返り討ち！<br />
+                                                    <span style={{ fontSize: '1.1rem', color: '#fff', fontWeight: 'normal' }}>
+                                                        {attacker.treasures > 0
+                                                            ? `${target.name}に反撃され、お宝を1つ奪われた！`
+                                                            : `${target.name}に反撃されたが、お宝を持っていなかったので何も奪われなかった！`}
+                                                    </span>
                                                 </span>
                                             )}
                                             {!currentStealBattle.substituteUsed && !currentStealBattle.success && !currentStealBattle.isCounter && (
@@ -288,6 +198,34 @@ export function TreasureModals() {
                 )}
             </AnimatePresence>
 
+            {/* Card Target Selection Help Overlay */}
+            <AnimatePresence>
+                {phase === 'card_target_selection' && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        style={{
+                            position: 'absolute',
+                            top: 20,
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            background: 'var(--accent)',
+                            color: 'white',
+                            padding: '12px 24px',
+                            borderRadius: '30px',
+                            fontSize: '1.2rem',
+                            fontWeight: 'bold',
+                            zIndex: 1000,
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                            pointerEvents: 'none'
+                        }}
+                    >
+                        マップ上のマスをタップして指定してください
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Game Over Modal */}
             <AnimatePresence>
                 {phase === 'game_over' && winner && (
@@ -295,11 +233,28 @@ export function TreasureModals() {
                         <motion.div className="modal" variants={modalVariants} initial="hidden" animate="visible" exit="hidden" style={{ textAlign: 'center', maxWidth: 450 }}>
                             <div style={{ fontSize: '4rem', marginBottom: 16 }}>👑</div>
                             <div className="modal-title" style={{ fontSize: '2rem', marginBottom: 24 }}>ゲーム終了！</div>
-                            <div className="modal-body" style={{ fontSize: '1.2rem' }}>
-                                お宝ハントの勝者は...<br /><br />
-                                <strong style={{ fontSize: '1.8rem', color: COLOR_HEX[winner.color] }}>{winner.name}</strong>
-                                <br /><br />
-                                お宝を <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'gold' }}>{winner.treasures}</span> 個 集めました！
+                            <div className="modal-body" style={{ fontSize: '1.2rem', padding: '0 16px' }}>
+                                <div style={{ marginBottom: 20 }}>
+                                    お宝ハントの勝者は...<br /><br />
+                                    <strong style={{ fontSize: '1.8rem', color: COLOR_HEX[winner.color] }}>{winner.name}</strong>
+                                    <br /><br />
+                                    お宝を <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'gold' }}>{winner.treasures}</span> 個 集めました！
+                                </div>
+                                <div style={{ borderTop: '1px solid #444', paddingTop: 16 }}>
+                                    <div style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: 12 }}>最終結果（ランキング）</div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, textAlign: 'left' }}>
+                                        {[...players].sort((a, b) => b.treasures - a.treasures).map((p, i) => (
+                                            <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '8px 12px', borderRadius: 8 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <span style={{ fontWeight: 'bold', width: 20 }}>{i + 1}位</span>
+                                                    <span style={{ width: 12, height: 12, borderRadius: '50%', background: COLOR_HEX[p.color], display: 'inline-block' }} />
+                                                    {p.name}
+                                                </div>
+                                                <div style={{ fontWeight: 'bold', color: 'gold' }}>{p.treasures} 個</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                             <button className="btn btn-primary" onClick={resetGame} style={{ width: '100%', marginTop: 24, fontSize: '1.2rem', padding: '16px' }}>
                                 ロビーに戻る

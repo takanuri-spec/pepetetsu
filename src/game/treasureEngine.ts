@@ -1,4 +1,4 @@
-import type { GameSettings, LobbyPlayer } from './types';
+import type { GameSettings, LobbyPlayer, GameMap } from './types';
 import type { TreasureGameState, TreasurePlayer, MiningRecord } from './treasureTypes';
 import { GAME_MAP } from './mapData';
 import { getTreasureMap } from './treasureMaps';
@@ -60,6 +60,9 @@ export function createInitialTreasureState(
         movingPath: [],
         winner: null,
         settings,
+        pendingCardAction: null,
+        pendingMovement: null,
+        pendingStealTargetId: null,
     };
 }
 
@@ -72,9 +75,14 @@ export const BASE_MINING_CHANCE = 0.25;
 /**
  * Calculates the success rate of mining a specific node.
  * 25% base + (25% * number of adjacent mined nodes).
+ * gameMap: 現在プレイ中のマップ情報（省略時は後方互換のためデフォルトマップを使用）
  */
-export function calcMiningChance(nodeId: number, minedNodes: Record<number, MiningRecord>): number {
-    const node = GAME_MAP.nodes[nodeId];
+export function calcMiningChance(
+    nodeId: number,
+    minedNodes: Record<number, MiningRecord>,
+    gameMap: GameMap = GAME_MAP
+): number {
+    const node = gameMap.nodes[nodeId];
     if (!node) return 0;
 
     let adjacentMinedCount = 0;
@@ -88,12 +96,16 @@ export function calcMiningChance(nodeId: number, minedNodes: Record<number, Mini
     return Math.min(BASE_MINING_CHANCE + bonus, 1.0); // Max 100%
 }
 
-export function performMining(nodeId: number, minedNodes: Record<number, MiningRecord>): { success: boolean, type: 'normal' | 'rare' | 'trap' | 'empty' | 'fail' } {
+export function performMining(
+    nodeId: number,
+    minedNodes: Record<number, MiningRecord>,
+    gameMap: GameMap = GAME_MAP
+): { success: boolean, type: 'normal' | 'rare' | 'trap' | 'empty' | 'fail' } {
     if (minedNodes[nodeId]) {
         return { success: false, type: 'empty' }; // Already mined
     }
 
-    const chance = calcMiningChance(nodeId, minedNodes);
+    const chance = calcMiningChance(nodeId, minedNodes, gameMap);
     const roll = Math.random();
 
     if (roll <= chance) {
@@ -237,19 +249,96 @@ export function _handleTreasureRouteSelection(set: any, get: any, routeId: strin
     const route = s.routeInfos.find((r: any) => r.id === routeId);
     if (!route) return;
 
-    set({
-        phase: 'playing',
-        movingPath: route.path,
-        isAnimating: true,
-        routeInfos: [],
-        hoveredRouteId: null
-    });
+    _executeMovementChunk(set, get, route.path, route.landingNodeId);
+}
 
-    const animDuration = route.path.length * 380 + 300;
+function _executeMovementChunk(set: any, get: any, fullPath: number[], landingNodeId: number) {
+    const s = get();
+    const player = s.players[s.currentPlayerIndex];
+    let stealTarget = null;
+    let stealNodeIndex = -1;
 
-    setTimeout(() => {
-        _finishTreasureMovement(set, get, route);
-    }, animDuration);
+    for (let i = 0; i < fullPath.length - 1; i++) {
+        const nodeId = fullPath[i];
+        const opponentsHere = s.players.filter((p: TreasurePlayer) => p.id !== player.id && p.position === nodeId && p.treasures > 0);
+        if (opponentsHere.length > 0) {
+            opponentsHere.sort((a: TreasurePlayer, b: TreasurePlayer) => b.treasures - a.treasures);
+            stealTarget = opponentsHere[0];
+            stealNodeIndex = i;
+            break;
+        }
+    }
+
+    if (stealTarget) {
+        const chunkPath = fullPath.slice(0, stealNodeIndex + 1);
+        const remainingPath = fullPath.slice(stealNodeIndex + 1);
+
+        set({
+            phase: 'playing',
+            movingPath: chunkPath,
+            isAnimating: true,
+            routeInfos: [],
+            hoveredRouteId: null,
+            pendingMovement: { path: remainingPath, landingNodeId: landingNodeId },
+            pendingStealTargetId: stealTarget.id
+        });
+
+        const animDuration = chunkPath.length * 380 + 300;
+        setTimeout(() => {
+            _handleIntermediateStop(set, get);
+        }, animDuration);
+    } else {
+        set({
+            phase: 'playing',
+            movingPath: fullPath,
+            isAnimating: true,
+            routeInfos: [],
+            hoveredRouteId: null,
+            pendingMovement: null,
+            pendingStealTargetId: null
+        });
+
+        const animDuration = fullPath.length * 380 + 300;
+        setTimeout(() => {
+            _finishTreasureMovement(set, get, { path: fullPath, landingNodeId });
+        }, animDuration);
+    }
+}
+
+function _handleIntermediateStop(set: any, get: any) {
+    const s = get();
+    const player = s.players[s.currentPlayerIndex];
+    const chunkPath = s.movingPath;
+    const targetNodeId = chunkPath[chunkPath.length - 1];
+
+    // Update Player Position
+    const players = s.players.map((p: TreasurePlayer) =>
+        p.id === player.id ? { ...p, position: targetNodeId } : p
+    );
+    set({ players, movingPath: [], isAnimating: false });
+
+    // Perform pass-by steal
+    const stealTarget = players.find((p: TreasurePlayer) => p.id === s.pendingStealTargetId);
+    if (stealTarget) {
+        const updatedPlayer = players.find((p: TreasurePlayer) => p.id === player.id)!;
+        const stealResult = performSteal('pass_by', updatedPlayer, stealTarget);
+        set({
+            currentStealBattle: {
+                attackerId: player.id,
+                targetId: stealTarget.id,
+                success: stealResult.success,
+                isCounter: stealResult.isCounter,
+                substituteUsed: stealResult.substituteUsed,
+                type: 'pass_by'
+            },
+            phase: 'steal_result'
+        });
+    } else {
+        // Fallback
+        if (s.pendingMovement) {
+            _executeMovementChunk(set, get, s.pendingMovement.path, s.pendingMovement.landingNodeId);
+        }
+    }
 }
 
 function _finishTreasureMovement(set: any, get: any, route: any) {
@@ -262,24 +351,32 @@ function _finishTreasureMovement(set: any, get: any, route: any) {
     );
     set({ players, movingPath: [], isAnimating: false });
 
-    // 2. Resolve Stealing first! (If landing on same node)
+    // 2. Resolve Stealing first!
     const landingNodeId = route.landingNodeId;
-    const opponentsHere = players.filter((p: TreasurePlayer) => p.id !== player.id && p.position === landingNodeId && p.treasures > 0);
 
+    let stealTarget = null;
+    let stealType: 'same_node' | 'pass_by' | null = null;
+    let stealResult = null;
+
+    const opponentsHere = players.filter((p: TreasurePlayer) => p.id !== player.id && p.position === landingNodeId && p.treasures > 0);
     if (opponentsHere.length > 0) {
-        // Attempt steal
-        const target = opponentsHere[0];
+        opponentsHere.sort((a: TreasurePlayer, b: TreasurePlayer) => b.treasures - a.treasures);
+        stealTarget = opponentsHere[0];
+        stealType = 'same_node';
+    }
+
+    if (stealTarget && stealType) {
         const updatedPlayer = players.find((p: TreasurePlayer) => p.id === player.id)!;
-        const stealResult = performSteal('same_node', updatedPlayer, target);
+        stealResult = performSteal(stealType, updatedPlayer, stealTarget);
 
         set({
             currentStealBattle: {
                 attackerId: player.id,
-                targetId: target.id,
+                targetId: stealTarget.id,
                 success: stealResult.success,
                 isCounter: stealResult.isCounter,
                 substituteUsed: stealResult.substituteUsed,
-                type: 'same_node'
+                type: stealType
             },
             phase: 'steal_result'
         });
@@ -302,7 +399,7 @@ function _finishTreasureMovement(set: any, get: any, route: any) {
     const currentP = players.find((p: TreasurePlayer) => p.id === player.id)!;
     const isSealed = currentP.activeEffects.some((e: any) => e.type === 'sealed');
 
-    const mineResult = performMining(landingNodeId, s.minedNodes);
+    const mineResult = performMining(landingNodeId, s.minedNodes, s.map);
     if (mineResult.type !== 'empty' && !isSealed) {
         set({
             currentMiningResult: { nodeId: landingNodeId, type: mineResult.type },
@@ -471,7 +568,13 @@ export function _acknowledgeSteal(set: any, get: any) {
 
     set({ players, currentStealBattle: null, phase: 'playing' });
 
-    // After stealing, we STILL need to resolve mining if we landed on an unmined node.
+    if (s.pendingMovement) {
+        // Resume movement!
+        _executeMovementChunk(set, get, s.pendingMovement.path, s.pendingMovement.landingNodeId);
+        return;
+    }
+
+    // After stealing (same_node), we STILL need to resolve mining if we landed on an unmined node.
     const player = s.players[s.currentPlayerIndex];
     const node = s.map.nodes[player.position];
     if (node && node.type === 'bonus') {
@@ -484,7 +587,7 @@ export function _acknowledgeSteal(set: any, get: any) {
         return;
     }
 
-    const mineResult = performMining(player.position, s.minedNodes);
+    const mineResult = performMining(player.position, s.minedNodes, s.map);
     if (mineResult.type !== 'empty') {
         set({
             currentMiningResult: { nodeId: player.position, type: mineResult.type },
@@ -569,9 +672,7 @@ export function _useCard(set: any, get: any, cardId: string, targetPlayerId?: st
             if (!targetPlayerId) return;
             const targetIdx = players.findIndex(p => p.id === targetPlayerId);
             if (targetIdx < 0) return;
-            const allNodeIds = Object.keys(s.map.nodes).map(Number);
-            const randomNodeId = allNodeIds[Math.floor(Math.random() * allNodeIds.length)];
-            players[targetIdx] = { ...players[targetIdx], position: randomNodeId };
+            // Node selection deferred
             break;
         }
         case 'paralysis': {
@@ -586,15 +687,7 @@ export function _useCard(set: any, get: any, cardId: string, targetPlayerId?: st
             break;
         }
         case 'time_machine': {
-            // 自分の採掘済マス1つを未採掘に戻す
-            const myMinedNodeIds = Object.entries(s.minedNodes)
-                .filter(([, record]: [string, any]) => record.playerId === player.id)
-                .map(([id]) => Number(id));
-            if (myMinedNodeIds.length === 0) return;
-            const targetNodeId = myMinedNodeIds[Math.floor(Math.random() * myMinedNodeIds.length)];
-            const newMinedNodes = { ...s.minedNodes };
-            delete newMinedNodes[targetNodeId];
-            set({ minedNodes: newMinedNodes });
+            // Node selection deferred
             break;
         }
         default:
@@ -606,4 +699,37 @@ export function _useCard(set: any, get: any, cardId: string, targetPlayerId?: st
     players[playerIdx] = { ...players[playerIdx], cards: newCards };
 
     set({ players, phase: 'playing' });
+}
+
+export function _setupCardNodeSelection(set: any, _get: any, cardId: string, actionType: 'blow_away' | 'time_machine', targetPlayerId?: string) {
+    set({
+        phase: 'card_target_selection',
+        pendingCardAction: { cardId, actionType, targetPlayerId }
+    });
+}
+
+export function _confirmCardNodeSelection(set: any, get: any, nodeId: number) {
+    const s = get();
+    if (s.phase !== 'card_target_selection' || !s.pendingCardAction) return;
+
+    const { cardId, actionType, targetPlayerId } = s.pendingCardAction;
+    const player = s.players[s.currentPlayerIndex];
+    let players = [...s.players] as TreasurePlayer[];
+    const playerIdx = players.findIndex(p => p.id === player.id);
+
+    if (actionType === 'blow_away' && targetPlayerId) {
+        const targetIdx = players.findIndex(p => p.id === targetPlayerId);
+        if (targetIdx >= 0) {
+            players[targetIdx] = { ...players[targetIdx], position: nodeId };
+        }
+    } else if (actionType === 'time_machine') {
+        const newMinedNodes = { ...s.minedNodes };
+        delete newMinedNodes[nodeId];
+        set({ minedNodes: newMinedNodes });
+    }
+
+    const newCards = player.cards.filter((c: import('./treasureTypes').Card) => c.id !== cardId);
+    players[playerIdx] = { ...players[playerIdx], cards: newCards };
+
+    set({ players, phase: 'playing', pendingCardAction: null });
 }

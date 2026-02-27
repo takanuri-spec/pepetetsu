@@ -79,7 +79,9 @@ const INITIAL_STATE: Omit<StoreState, 'updateSettings' | 'updateLobbyPlayers' | 
   settings: DEFAULT_SETTINGS,
   lobbyPlayers: [
     { name: 'プレイヤー1', color: 'red' as PlayerColor, isHuman: true },
-    { name: 'CPU', color: 'blue' as PlayerColor, isHuman: false },
+    { name: 'CPU1', color: 'blue' as PlayerColor, isHuman: false },
+    { name: 'CPU2', color: 'green' as PlayerColor, isHuman: false },
+    { name: 'CPU3', color: 'yellow' as PlayerColor, isHuman: false },
   ],
   players: [],
   currentPlayerIndex: 0,

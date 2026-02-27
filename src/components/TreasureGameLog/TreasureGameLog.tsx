@@ -50,7 +50,10 @@ export function TreasureGameLog() {
             const typeMap: Record<string, { text: string; emoji: string }> = {
                 'normal': { text: 'お宝を発見！(+1)', emoji: '💎' },
                 'rare': { text: 'レアなお宝！(+2)', emoji: '🌟' },
-                'trap': { text: '罠にかかった...(-1)', emoji: '💣' },
+                'trap': {
+                    text: player.treasures === 0 ? '罠にかかったが元々お宝を持っていなかった' : '罠にかかった...(-1)',
+                    emoji: '💣'
+                },
                 'fail': { text: '何も見つからなかった', emoji: '💦' },
                 'empty': { text: 'すでに掘り尽くされている', emoji: '🕳️' },
             };

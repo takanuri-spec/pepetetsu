@@ -54,6 +54,7 @@ export type TreasureGamePhase =
     | 'steal_result' // 略奪バトルの結果ダイアログ
     | 'card_action' // カード使用ダイアログ
     | 'card_result' // カード取得ダイアログ
+    | 'card_target_selection' // カードの対象マス選択
     | 'game_over';
 
 export interface TreasureGameState {
@@ -78,6 +79,8 @@ export interface TreasureGameState {
         type: 'pass_by' | 'same_node';
     } | null;
 
+    pendingCardAction: { cardId: string, actionType: 'blow_away' | 'time_machine', targetPlayerId?: string } | null;
+
     diceValue: number | null;
     movingPath: number[];
     winner: TreasurePlayer | null;
@@ -86,4 +89,6 @@ export interface TreasureGameState {
     // UI state
     pendingMoves: number;
     isAnimating: boolean;
+    pendingMovement: { path: number[], landingNodeId: number } | null;
+    pendingStealTargetId: string | null;
 }

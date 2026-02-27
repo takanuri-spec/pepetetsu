@@ -1,4 +1,5 @@
 import type { GameMap, MapNode, MapEdge } from './types';
+import { COMPACT_GAME_MAP } from './mapCompact';
 
 // ========== マップ定義型 ==========
 
@@ -15,14 +16,16 @@ export interface TreasureMapDef {
 /**
  * 3×3グリッドのノードクラスターを生成する。
  * 内部は格子状に接続され、採掘マス(property)とカードマス(bonus)が混在する。
- * カードマスは中央ノード(index=4)に配置される。
+ * cardNodeIndex: カードマスにするノードのインデックス（デフォルトは角や端に散らす）
+ * 中央(index=4)は必ず採掘マスにして、隣接採掘による確率上昇が生まれやすくする。
  */
 function createCluster(
     centerX: number,
     centerY: number,
     spacing: number,
     startId: number,
-    clusterName: string
+    clusterName: string,
+    cardNodeIndex: number = 0  // デフォルトは左上の角
 ): { nodes: MapNode[]; internalEdges: MapEdge[] } {
     const positions = [
         [-1, -1], [0, -1], [1, -1],
@@ -32,7 +35,7 @@ function createCluster(
 
     const nodes: MapNode[] = positions.map(([dx, dy], i) => {
         const id = startId + i;
-        const isCardNode = i === 4; // 中央をカードマスに
+        const isCardNode = i === cardNodeIndex;
         return {
             id,
             name: `${clusterName}-${i + 1}`,
@@ -121,12 +124,12 @@ function buildFiveIslands(): GameMap {
     const spacing = 60;
     const clusterGap = 400;
 
-    // 5つのクラスター（四隅＋中央）
-    const nw = createCluster(200, 200, spacing, 0, '北西');
-    const ne = createCluster(200 + clusterGap, 200, spacing, 9, '北東');
-    const center = createCluster(200 + clusterGap / 2, 200 + clusterGap / 2, spacing, 18, '中央');
-    const sw = createCluster(200, 200 + clusterGap, spacing, 27, '南西');
-    const se = createCluster(200 + clusterGap, 200 + clusterGap, spacing, 36, '南東');
+    // 5つのクラスター（四隅＋中央）: カードマスを右下角・左上角・右端・左下・上端に散らす
+    const nw = createCluster(200, 200, spacing, 0, '北西', 8);          // 右下角
+    const ne = createCluster(200 + clusterGap, 200, spacing, 9, '北東', 6);   // 左下角
+    const center = createCluster(200 + clusterGap / 2, 200 + clusterGap / 2, spacing, 18, '中央', 1); // 上端
+    const sw = createCluster(200, 200 + clusterGap, spacing, 27, '南西', 2);  // 右上角
+    const se = createCluster(200 + clusterGap, 200 + clusterGap, spacing, 36, '南東', 3); // 左端
 
     const allNodes = [...nw.nodes, ...ne.nodes, ...center.nodes, ...sw.nodes, ...se.nodes];
     const allEdges = [...nw.internalEdges, ...ne.internalEdges, ...center.internalEdges, ...sw.internalEdges, ...se.internalEdges];
@@ -174,13 +177,13 @@ function buildFiveIslands(): GameMap {
 function buildTwinContinents(): GameMap {
     const spacing = 60;
 
-    // 左大陸（3×3 × 2クラスター分を上下に重ねる）
-    const leftTop = createCluster(200, 200, spacing, 0, '左上');
-    const leftBot = createCluster(200, 400, spacing, 9, '左下');
+    // 左大陸（それぞれ異なる角にカードマスを散らす）
+    const leftTop = createCluster(200, 200, spacing, 0, '左上', 2);   // 右上角
+    const leftBot = createCluster(200, 400, spacing, 9, '左下', 7);   // 下端中
 
     // 右大陸
-    const rightTop = createCluster(700, 200, spacing, 18, '右上');
-    const rightBot = createCluster(700, 400, spacing, 27, '右下');
+    const rightTop = createCluster(700, 200, spacing, 18, '右上', 6); // 左下角
+    const rightBot = createCluster(700, 400, spacing, 27, '右下', 1); // 上端中
 
     const allNodes = [...leftTop.nodes, ...leftBot.nodes, ...rightTop.nodes, ...rightBot.nodes];
     const allEdges = [...leftTop.internalEdges, ...leftBot.internalEdges, ...rightTop.internalEdges, ...rightBot.internalEdges];
@@ -218,12 +221,13 @@ function buildRingOfFire(): GameMap {
     const clusters: ReturnType<typeof createCluster>[] = [];
     const clusterNames = ['火山島', '珊瑚島', '密林島', '氷河島', '砂漠島', '鉱山島'];
 
-    // 6つのクラスターを円形に配置
+    // 6つのクラスターを円形に配置: カードマスを順番に角・端を変えて散らす
+    const cardPositions = [0, 2, 8, 6, 3, 5]; // 左上角, 右上角, 右下角, 左下角, 左端, 右端
     for (let i = 0; i < 6; i++) {
         const angle = (i / 6) * Math.PI * 2 - Math.PI / 2; // 上から時計回り
         const clusterX = Math.round(cx + Math.cos(angle) * ringRadius);
         const clusterY = Math.round(cy + Math.sin(angle) * ringRadius);
-        clusters.push(createCluster(clusterX, clusterY, spacing, i * 9, clusterNames[i]));
+        clusters.push(createCluster(clusterX, clusterY, spacing, i * 9, clusterNames[i], cardPositions[i]));
     }
 
     const allNodes = clusters.flatMap(c => c.nodes);
@@ -283,6 +287,13 @@ function getBestEdgeNode(nodes: MapNode[], targetAngle: number): number {
 // ========== エクスポート ==========
 
 export const TREASURE_MAPS: TreasureMapDef[] = [
+    {
+        id: 'compact_map',
+        name: 'コンパクト',
+        description: '左に3x3、中央に5x5、右に4x4の密集エリアを配置したコンパクトマップ',
+        emoji: '🗺️',
+        build: () => COMPACT_GAME_MAP,
+    },
     {
         id: 'five_islands',
         name: '五つの島',

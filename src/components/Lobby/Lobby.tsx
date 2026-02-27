@@ -16,21 +16,6 @@ export function Lobby() {
     updateLobbyPlayers(updated);
   }
 
-  function addPlayer() {
-    if (lobbyPlayers.length >= 4) return;
-    const usedColors = lobbyPlayers.map(p => p.color);
-    const nextColor = PLAYER_COLORS.find(c => !usedColors.includes(c)) ?? 'red';
-    updateLobbyPlayers([
-      ...lobbyPlayers,
-      { name: `プレイヤー${lobbyPlayers.length + 1}`, color: nextColor, isHuman: true },
-    ]);
-  }
-
-  function removePlayer(index: number) {
-    if (lobbyPlayers.length <= 2) return;
-    updateLobbyPlayers(lobbyPlayers.filter((_, i) => i !== index));
-  }
-
   const canStart = lobbyPlayers.length >= 2 && lobbyPlayers.length <= 4;
 
   return (
@@ -80,21 +65,9 @@ export function Lobby() {
                   title={COLOR_LABELS[color]}
                 />
               ))}
-              {lobbyPlayers.length > 2 && (
-                <button
-                  className="btn btn-sm btn-danger"
-                  onClick={() => removePlayer(index)}
-                  style={{ marginLeft: 4 }}
-                >✕</button>
-              )}
             </div>
           </div>
         ))}
-        {lobbyPlayers.length < 4 && (
-          <button className="btn btn-secondary btn-sm" onClick={addPlayer} style={{ marginTop: 8 }}>
-            + プレイヤーを追加
-          </button>
-        )}
       </div>
 
       {/* Game Settings */}

@@ -248,6 +248,20 @@ export function Sidebar() {
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Return to Lobby */}
+      <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
+        <button
+          className="btn btn-secondary btn-sm"
+          style={{ width: '100%', opacity: 0.7, fontSize: '0.85rem' }}
+          onClick={() => {
+            if (window.confirm('ゲームを中断してロビーに戻りますか？')) {
+              resetGame();
+            }
+          }}
+        >
+          🚪 ロビーに戻る
+        </button>
+      </div>
     </div>
   );
 }
