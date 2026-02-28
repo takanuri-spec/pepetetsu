@@ -353,21 +353,7 @@ export function TreasureBoard() {
                       transition={{ type: 'spring', stiffness: 200, damping: 20 }}
                       style={{
                         cursor: isClickable ? 'pointer' : 'default',
-                        pointerEvents: isClickable ? 'all' : 'none'
-                      }}
-                      onPointerDown={(e) => {
-                        if (!isClickable) return;
-                        // Prevent map dragging if we touched the token
-                        e.stopPropagation();
-                      }}
-                      onClickCapture={(e) => {
-                        if (!isClickable) return;
-                        e.stopPropagation();
-                        if (cardPopupPlayerId === player.id) {
-                          closeCardPopup();
-                        } else {
-                          openCardPopup(player.id);
-                        }
+                        pointerEvents: isClickable ? 'auto' : 'none'
                       }}
                     >
                       {/* クリック可能リング */}
@@ -379,7 +365,7 @@ export function TreasureBoard() {
                         />
                       )}
                       {/* Token shadow */}
-                      <circle cx={0} cy={2} r={15} fill="rgba(0,0,0,0.4)" />
+                      <circle cx={0} cy={2} r={15} fill="rgba(0,0,0,0.4)" style={{ pointerEvents: 'none' }} />
                       {/* Token body */}
                       <circle
                         cx={0}
@@ -388,11 +374,39 @@ export function TreasureBoard() {
                         fill={COLOR_HEX[player.color]}
                         stroke="white"
                         strokeWidth={2}
+                        style={{ pointerEvents: 'none' }}
                       />
                       {/* Player initial */}
-                      <text x={0} y={5} textAnchor="middle" fontSize={14} fill="white" fontWeight="700">
+                      <text x={0} y={5} textAnchor="middle" fontSize={14} fill="white" fontWeight="700" style={{ pointerEvents: 'none' }}>
                         {player.name[0]}
                       </text>
+
+                      {/* Hit Area (Top most layer to block clicks cleanly) */}
+                      {isClickable && (
+                        <circle
+                          cx={0} cy={0} r={24} fill="transparent"
+                          cursor="pointer"
+                          style={{ pointerEvents: 'auto' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (cardPopupPlayerId === player.id) {
+                              closeCardPopup();
+                            } else {
+                              openCardPopup(player.id);
+                            }
+                          }}
+                          onTouchEnd={(e) => {
+                            // On mobile, sometimes onClick is swallowed by panning containers, onTouchEnd helps capture it.
+                            e.stopPropagation();
+                            // Optional: e.preventDefault() prevents double firing of click, but let's just let it fire as normal.
+                            if (cardPopupPlayerId === player.id) {
+                              closeCardPopup();
+                            } else {
+                              openCardPopup(player.id);
+                            }
+                          }}
+                        />
+                      )}
                     </motion.g>
                   );
                 })}
