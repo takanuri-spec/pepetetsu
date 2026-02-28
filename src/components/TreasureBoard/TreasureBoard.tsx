@@ -232,17 +232,13 @@ export function TreasureBoard({ isMobile }: { isMobile?: boolean }) {
                     fillColor = '#333';
                   }
 
-                  if (isHoveredLanding) {
-                    nodeStroke = currentPlayerColorStr;
-                    nodeStrokeWidth = 3;
-                  }
-
                   const selectableRoutes = phase === 'route_selection' ? routeInfos.filter((r: any) => r.landingNodeId === node.id) : [];
                   const isSelectableLanding = phase === 'route_selection' && selectableRoutes.length > 0;
 
-                  if (isSelectableLanding && !isHoveredLanding) {
-                    nodeStroke = currentPlayerColorStr;
-                    nodeStrokeWidth = 3;
+                  // 選択可能な行き先マスの枠線を白にして、中の色(ピンク等)との境界をくっきりさせる
+                  if (isSelectableLanding) {
+                    nodeStroke = 'white';
+                    nodeStrokeWidth = isHoveredLanding ? 4 : 2;
                   }
 
                   const cursorStyle = phase === 'card_target_selection'
@@ -329,7 +325,18 @@ export function TreasureBoard({ isMobile }: { isMobile?: boolean }) {
                         );
                       })()}
 
-                      {nodeStrokeWidth > 3 && !isHoveredLanding && (
+                      {/* 行き先マスのブリンク強調（視認性向上） */}
+                      {isSelectableLanding && (
+                        <motion.circle
+                          cx={node.x} cy={node.y} r={r + (isHoveredLanding ? 8 : 4)}
+                          fill="none" stroke={currentPlayerColorStr} strokeWidth={isHoveredLanding ? 5 : 3}
+                          initial={{ opacity: 0.3 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ repeat: Infinity, repeatType: 'reverse', duration: 0.6 }}
+                        />
+                      )}
+
+                      {nodeStrokeWidth > 3 && !isHoveredLanding && !isSelectableLanding && (
                         <circle cx={node.x} cy={node.y} r={r + 4} fill="none" stroke={nodeStroke} strokeWidth={2} opacity={0.4} />
                       )}
 
@@ -363,7 +370,13 @@ export function TreasureBoard({ isMobile }: { isMobile?: boolean }) {
                 })}
 
                 {/* Player Tokens */}
-                {players.map((player) => {
+                {[...players].sort((a, b) => {
+                  const aIsTurn = a.id === players[currentPlayerIndex]?.id;
+                  const bIsTurn = b.id === players[currentPlayerIndex]?.id;
+                  if (aIsTurn && !bIsTurn) return 1;
+                  if (!aIsTurn && bIsTurn) return -1;
+                  return 0;
+                }).map((player) => {
                   const node = map.nodes[player.position] as MapNode | undefined;
                   if (!node) return null;
 
@@ -371,15 +384,18 @@ export function TreasureBoard({ isMobile }: { isMobile?: boolean }) {
                   const indexAtNode = playersAtNode.findIndex(p => p.id === player.id);
                   const { dx, dy } = getPlayerOffset(indexAtNode, playersAtNode.length);
 
+                  const isTurnPlayer = player.id === players[currentPlayerIndex]?.id;
+                  const tokenScale = isTurnPlayer ? 1.4 : 1.0;
+
                   // 現在のプレイヤー（人間ターン）のコマはクリック可能
-                  const isCurrentHuman = player.id === currentPlayer?.id && currentPlayer?.isHuman;
+                  const isCurrentHuman = isTurnPlayer && currentPlayer?.isHuman;
                   const hasCards = player.cards.filter(c => !c.isPassive).length > 0;
                   const isClickable = isCurrentHuman && hasCards && phase === 'playing';
 
                   return (
                     <motion.g
                       key={player.id}
-                      animate={{ x: node.x + dx, y: node.y + dy }}
+                      animate={{ x: node.x + dx, y: node.y + dy, scale: tokenScale }}
                       transition={{ type: 'spring', stiffness: 200, damping: 20 }}
                       style={{
                         cursor: isClickable ? 'pointer' : 'default',
