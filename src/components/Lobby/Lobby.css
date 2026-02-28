@@ -401,3 +401,142 @@
     cursor: not-allowed;
     transform: none;
 }
+
+/* ========== Mobile Adjustments ========== */
+@media (max-width: 768px) {
+    .lobby-screen {
+        overflow-y: auto;
+        min-height: 100dvh;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .lobby-header {
+        padding: 12px;
+    }
+
+    .lobby-logo-wrap {
+        gap: 8px;
+    }
+
+    .lobby-logo-title {
+        font-size: 2.2rem;
+    }
+
+    .lobby-logo-dice {
+        font-size: 1.8rem;
+    }
+
+    .lobby-main {
+        display: flex;
+        flex-direction: column;
+        padding: 0 16px 32px;
+        max-height: none;
+        overflow: visible;
+        gap: 20px;
+    }
+
+    .lobby-modes {
+        flex-direction: column;
+        gap: 12px;
+        min-height: auto;
+    }
+
+    .mode-card {
+        padding: 8px;
+        min-height: 160px;
+    }
+
+    .mode-card-img {
+        object-fit: cover;
+    }
+
+    .lobby-settings-pane {
+        padding-right: 0;
+        overflow: visible;
+        gap: 16px;
+    }
+
+    .setting-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+
+    .setting-label {
+        font-size: 0.9rem;
+    }
+
+    .segment-control {
+        width: 100%;
+        display: flex;
+    }
+
+    .segment-btn {
+        flex: 1;
+        padding: 10px 4px;
+        font-size: 0.85rem;
+    }
+
+    .player-row {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .player-row:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .color-dots {
+        width: 100%;
+        justify-content: space-between;
+        margin-bottom: 4px;
+    }
+
+    .color-dot {
+        width: 28px;
+        height: 28px;
+    }
+
+    .player-name-wrap {
+        width: calc(100% - 100px);
+        /* Leave room for human/cpu toggle */
+    }
+
+    .player-input {
+        font-size: 1rem;
+        padding: 10px 12px;
+    }
+
+    .name-random-btn {
+        padding: 10px;
+        font-size: 1.1rem;
+    }
+
+    .lobby-manual-btn.desktop-only {
+        display: none;
+    }
+
+    .lobby-manual-btn.mobile-only {
+        position: relative;
+        display: block;
+        right: auto;
+        top: auto;
+        transform: none;
+        width: 100%;
+        padding: 16px;
+        font-size: 1.1rem;
+        font-weight: bold;
+        text-align: center;
+        margin-top: 10px;
+        background: rgba(255, 255, 255, 0.15);
+    }
+}
+
+@media (min-width: 769px) {
+    .lobby-manual-btn.mobile-only {
+        display: none;
+    }
+}

@@ -86,7 +86,7 @@ export function Lobby() {
           <h1 className="lobby-logo-title">ペペテツ</h1>
           <span className="lobby-logo-dice">🎲</span>
         </div>
-        <button className="lobby-manual-btn" onClick={() => setIsManualOpen(true)}>
+        <button className="lobby-manual-btn desktop-only" onClick={() => setIsManualOpen(true)}>
           📖 あそびかた
         </button>
       </header>
@@ -270,6 +270,9 @@ export function Lobby() {
               ))}
             </div>
           </div>
+          <button className="lobby-manual-btn mobile-only" onClick={() => setIsManualOpen(true)}>
+            📖 あそびかた
+          </button>
         </div>
       </div>
 
