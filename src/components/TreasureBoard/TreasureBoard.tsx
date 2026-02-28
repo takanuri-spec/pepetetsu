@@ -280,16 +280,25 @@ export function TreasureBoard({ isMobile }: { isMobile?: boolean }) {
                             setRoutePopupNodeId(null);
                           } else {
                             // 複数ルートある場合
-                            const storeHoveredId = useTreasureStore.getState().hoveredRouteId;
-                            if (routePopupNodeId === node.id) {
-                              // 既にポップアップが開いている状態ならタップで次のルートに切り替える(トグル)
-                              const currentIdx = selectableRoutes.findIndex((r: any) => r.id === storeHoveredId);
-                              const nextIdx = (currentIdx + 1) % selectableRoutes.length;
-                              useTreasureStore.getState().setHoveredRoute(selectableRoutes[nextIdx].id);
+                            if (!isMobile) {
+                              // PCの場合：現在のカーソル位置でハイライトされているルートを即座に決定
+                              const storeHoveredId = useTreasureStore.getState().hoveredRouteId;
+                              if (storeHoveredId) {
+                                useTreasureStore.getState().selectRoute(storeHoveredId);
+                              }
                             } else {
-                              // 初回タップ時：ポップアップを開き、最初のルートをハイライトする
-                              setRoutePopupNodeId(node.id);
-                              useTreasureStore.getState().setHoveredRoute(selectableRoutes[0].id);
+                              // モバイルの場合：トグル操作とポップアップ
+                              const storeHoveredId = useTreasureStore.getState().hoveredRouteId;
+                              if (routePopupNodeId === node.id) {
+                                // 既にポップアップが開いている状態ならタップで次のルートに切り替える(トグル)
+                                const currentIdx = selectableRoutes.findIndex((r: any) => r.id === storeHoveredId);
+                                const nextIdx = (currentIdx + 1) % selectableRoutes.length;
+                                useTreasureStore.getState().setHoveredRoute(selectableRoutes[nextIdx].id);
+                              } else {
+                                // 初回タップ時：ポップアップを開き、最初のルートをハイライトする
+                                setRoutePopupNodeId(node.id);
+                                useTreasureStore.getState().setHoveredRoute(selectableRoutes[0].id);
+                              }
                             }
                           }
                         }
