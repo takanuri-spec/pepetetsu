@@ -5,7 +5,7 @@ import { TREASURE_MAPS } from '../../game/treasureMaps';
 export function TreasureSidebar() {
   const state = useTreasureStore();
 
-  const { players, currentPlayerIndex, round, phase, rollDiceAction, isRollingDice, rollingDiceDisplay, diceValue, resetGame, settings } = state;
+  const { players, currentPlayerIndex, round, phase, rollDiceAction, isRollingDice, rollingDiceDisplay, diceValue, resetGame, settings, openCardPopup, closeCardPopup, cardPopupPlayerId } = state;
 
   const canRoll = phase === 'playing' && !isRollingDice;
   const displayDiceVal = isRollingDice ? rollingDiceDisplay : diceValue;
@@ -134,15 +134,27 @@ export function TreasureSidebar() {
           {players.map((player, idx) => {
             const isCurrent = player.id === players[currentPlayerIndex]?.id;
 
+            const hasCards = player.cards.filter(c => !c.isPassive).length > 0;
+            const isClickable = isCurrent && hasCards && phase === 'playing';
+
             return (
               <div
                 key={player.id}
+                onClick={() => {
+                  if (!isClickable) return;
+                  if (cardPopupPlayerId === player.id) {
+                    closeCardPopup();
+                  } else {
+                    openCardPopup(player.id);
+                  }
+                }}
                 style={{
                   padding: '10px 12px',
                   borderRadius: '12px',
                   background: isCurrent ? 'var(--surface2)' : 'transparent',
                   border: isCurrent ? `2px solid ${COLOR_HEX[player.color]}` : '1px solid var(--border)',
                   transition: 'background 0.2s',
+                  cursor: isClickable ? 'pointer' : 'default',
                 }}
               >
                 {/* 名前行 */}

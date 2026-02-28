@@ -105,7 +105,7 @@ const getRouteByMouseAngle = (e: React.MouseEvent<SVGGElement>, routes: any[], c
   return bestRoute;
 };
 
-export function TreasureBoard() {
+export function TreasureBoard({ isMobile }: { isMobile?: boolean }) {
   const state = useTreasureStore();
   const { players, currentPlayerIndex, map, movingPath, isAnimating, routeInfos, hoveredRouteId, minedNodes, phase, cardPopupPlayerId, selectedCardId, openCardPopup, closeCardPopup, setSelectedCardId } = state;
   const svgRef = useRef<SVGSVGElement>(null);
@@ -179,26 +179,31 @@ export function TreasureBoard() {
     <>
       <TransformWrapper
         initialScale={1}
-        minScale={0.2}
-        maxScale={4}
+        minScale={isMobile ? 1 : 0.2}
+        maxScale={isMobile ? 1 : 4}
         wheel={{ step: 0.1 }}
         doubleClick={{ disabled: true }}
-        panning={{ velocityDisabled: true }}
+        panning={{ disabled: isMobile, velocityDisabled: true }}
+        pinch={{ disabled: isMobile }}
         centerOnInit={true}
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
-          <>
-            <div style={{ position: 'absolute', top: 16, right: 16, zIndex: 10, display: 'flex', gap: 8 }}>
-              <button className="btn btn-secondary btn-sm" onClick={() => zoomIn()}>🔍+</button>
-              <button className="btn btn-secondary btn-sm" onClick={() => zoomOut()}>🔍-</button>
-              <button className="btn btn-secondary btn-sm" onClick={() => resetTransform()}>リセット</button>
-            </div>
-            <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '100%', height: '100%' }}>
+          <div style={isMobile ? { width: '100%', height: '100%', overflow: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' } : {}}>
+            {!isMobile && (
+              <div style={{ position: 'absolute', top: 16, right: 16, zIndex: 10, display: 'flex', gap: 8 }}>
+                <button className="btn btn-secondary btn-sm" onClick={() => zoomIn()}>🔍+</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => zoomOut()}>🔍-</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => resetTransform()}>リセット</button>
+              </div>
+            )}
+            <TransformComponent wrapperStyle={isMobile ? { width: 'max-content', height: 'max-content' } : { width: '100%', height: '100%' }} contentStyle={isMobile ? { width: 'max-content', height: 'max-content' } : { width: '100%', height: '100%' }}>
               <svg
                 ref={svgRef}
                 viewBox={dynamicViewBox}
+                width={isMobile ? vbW : undefined}
+                height={isMobile ? vbH : undefined}
                 className="board-svg"
-                style={{ display: 'block', width: '100%', height: '100%' }}
+                style={isMobile ? { display: 'block' } : { display: 'block', width: '100%', height: '100%' }}
               >
                 {/* Nodes */}
                 {nodes.map((node: MapNode) => {
@@ -480,7 +485,7 @@ export function TreasureBoard() {
 
               </svg>
             </TransformComponent>
-          </>
+          </div>
         )}
       </TransformWrapper>
 

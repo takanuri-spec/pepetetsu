@@ -1,5 +1,6 @@
 import type { GameMap, MapNode, MapEdge } from './types';
 import { COMPACT_GAME_MAP } from './mapCompact';
+import { buildMobileGridMap } from './mapMobileGrid';
 
 // ========== マップ定義型 ==========
 
@@ -286,6 +287,13 @@ function getBestEdgeNode(nodes: MapNode[], targetX: number, targetY: number): nu
 // ========== エクスポート ==========
 
 export const TREASURE_MAPS: TreasureMapDef[] = [
+    {
+        id: 'mobile_grid',
+        name: 'モバイル(6x10)',
+        description: 'スマホ向けに最適化された6x10の固定グリッドマップ',
+        emoji: '📱',
+        build: buildMobileGridMap,
+    },
     {
         id: 'compact_map',
         name: 'コンパクト',

@@ -19,6 +19,8 @@ export interface TreasureStoreState extends TreasureGameState {
     hoveredRouteId: string | null;
     isRollingDice: boolean;
     rollingDiceDisplay: number | null;
+    cardPopupPlayerId: string | null;
+    selectedCardId: string | null;
 
     // Actions
     updateLobbyPlayers: (players: LobbyPlayer[]) => void;
@@ -35,12 +37,15 @@ export interface TreasureStoreState extends TreasureGameState {
     confirmCardNodeSelection: (nodeId: number) => void;
     cancelCardSelection: () => void;
     resetGame: () => void;
+    openCardPopup: (playerId: string) => void;
+    closeCardPopup: () => void;
+    setSelectedCardId: (cardId: string | null) => void;
 }
 
 // ========== Initial State ==========
 
 // Extract the required properties from TreasureGameState that we'll initialize below.
-type InitialStateSubset = Omit<TreasureStoreState, 'updateLobbyPlayers' | 'updateSettings' | 'startGame' | 'rollDiceAction' | 'selectRoute' | 'setHoveredRoute' | 'acknowledgeMining' | 'acknowledgeSteal' | 'acknowledgeCard' | 'useCard' | 'setupCardNodeSelection' | 'confirmCardNodeSelection' | 'cancelCardSelection' | 'resetGame'>;
+type InitialStateSubset = Omit<TreasureStoreState, 'updateLobbyPlayers' | 'updateSettings' | 'startGame' | 'rollDiceAction' | 'selectRoute' | 'setHoveredRoute' | 'acknowledgeMining' | 'acknowledgeSteal' | 'acknowledgeCard' | 'useCard' | 'setupCardNodeSelection' | 'confirmCardNodeSelection' | 'cancelCardSelection' | 'resetGame' | 'openCardPopup' | 'closeCardPopup' | 'setSelectedCardId'>;
 
 const INITIAL_STATE: InitialStateSubset = {
     phase: 'playing', // Starts immediately as playing or lobby via App.tsx logic
@@ -73,6 +78,8 @@ const INITIAL_STATE: InitialStateSubset = {
     pendingMovement: null,
     pendingStealTargetId: null,
     toasts: [],
+    cardPopupPlayerId: null,
+    selectedCardId: null,
 };
 
 export const useTreasureStore = create<TreasureStoreState>((set, get) => ({
@@ -146,10 +153,12 @@ export const useTreasureStore = create<TreasureStoreState>((set, get) => ({
 
     useCard: (cardId: string, targetPlayerId?: string) => {
         _useCard(set, get, cardId, targetPlayerId);
+        set({ cardPopupPlayerId: null, selectedCardId: null });
     },
 
     setupCardNodeSelection: (cardId, actionType, targetPlayerId) => {
         _setupCardNodeSelection(set, get, cardId, actionType, targetPlayerId);
+        set({ cardPopupPlayerId: null, selectedCardId: null });
     },
 
     confirmCardNodeSelection: (nodeId: number) => {
@@ -157,11 +166,15 @@ export const useTreasureStore = create<TreasureStoreState>((set, get) => ({
     },
 
     cancelCardSelection: () => {
-        set({ phase: 'playing', pendingCardAction: null });
+        set({ phase: 'playing', pendingCardAction: null, cardPopupPlayerId: null, selectedCardId: null });
     },
 
     resetGame: () => {
         set({ ...INITIAL_STATE });
         useGameStore.getState().resetGame();
     },
+
+    openCardPopup: (playerId: string) => set({ cardPopupPlayerId: playerId, selectedCardId: null }),
+    closeCardPopup: () => set({ cardPopupPlayerId: null, selectedCardId: null }),
+    setSelectedCardId: (cardId: string | null) => set({ selectedCardId: cardId }),
 }));

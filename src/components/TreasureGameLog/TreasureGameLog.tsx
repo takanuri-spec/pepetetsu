@@ -15,8 +15,9 @@ let logIdCounter = 0;
 /**
  * ゲームの進行状況をチャット風に表示するワイプUI。
  * 右下に常駐し、表示・非表示を切り替えられる。
+ * 右下に常駐し、表示・非表示を切り替えられる。
  */
-export function TreasureGameLog() {
+export function TreasureGameLog({ isMobile }: { isMobile?: boolean }) {
     const { players, currentPlayerIndex, phase, currentMiningResult, currentStealBattle, currentCardResult } = useTreasureStore();
     const [logs, setLogs] = useState<GameLogEntry[]>([]);
     const [isOpen, setIsOpen] = useState(true);
@@ -99,7 +100,8 @@ export function TreasureGameLog() {
     return (
         <div style={{
             position: 'fixed',
-            bottom: 16,
+            bottom: isMobile ? undefined : 16,
+            top: isMobile ? 56 : undefined,
             right: 16,
             zIndex: 500,
             width: isOpen ? 300 : 'auto',

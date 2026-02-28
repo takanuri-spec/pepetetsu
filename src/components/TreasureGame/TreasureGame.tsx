@@ -5,8 +5,11 @@ import { TreasureBoard } from '../TreasureBoard/TreasureBoard';
 import { TreasureSidebar } from '../TreasureGameInfo/TreasureSidebar';
 import { TreasureModals } from '../TreasureModals/TreasureModals';
 import { TreasureGameLog } from '../TreasureGameLog/TreasureGameLog';
+import { TreasureMobileUI } from './TreasureMobileUI';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 export function TreasureGame() {
+    const isMobile = useIsMobile(768);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     useEffect(() => {
@@ -15,6 +18,10 @@ export function TreasureGame() {
         const { settings, lobbyPlayers } = useGameStore.getState();
         useTreasureStore.getState().startGame!(settings, lobbyPlayers);
     }, []);
+
+    if (isMobile) {
+        return <TreasureMobileUI />;
+    }
 
     return (
         <div className="game-layout">
