@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { useTreasureStore } from '../../store/treasureStore';
@@ -6,6 +6,7 @@ import type { MapNode, MapEdge } from '../../game/types';
 import { COLOR_HEX } from '../../game/types';
 import { calcMiningChance } from '../../game/treasureEngine';
 import type { Card } from '../../game/treasureTypes';
+import { CARD_EMOJI } from '../../game/cardDefs';
 
 // 描画設定のトグル
 export const USE_ORTHOGONAL_LINES = true;
@@ -40,17 +41,7 @@ function getPlayerOffset(playerIndex: number, totalAtNode: number): { dx: number
   return { dx: Math.cos(angle) * baseOffset, dy: Math.sin(angle) * baseOffset };
 }
 
-// カードアイコン定義
-const CARD_EMOJI: Record<string, string> = {
-  'power_up': '⚔️',
-  'substitute': '🧸',
-  'seal': '🏺',
-  'blow_away': '🔨',
-  'paralysis': '⚡',
-  'phone_fraud': '📱',
-  'dice_1': '1️⃣',
-  'dice_10': '🔟',
-};
+// CARD_EMOJI は cardDefs.ts から import 済み
 
 // マウス座標の角度をもとに、直前ノードから対象ノードへ向かうルートの中で最も近いものを選択する
 const getRouteByMouseAngle = (e: React.MouseEvent<SVGGElement>, routes: any[], currentMap: any, targetNode: any) => {
@@ -135,45 +126,60 @@ export function TreasureBoard({ isMobile }: { isMobile?: boolean }) {
     }
   }, [movingPath, isAnimating]);
 
-  // ホバー中の分岐経路をハイライト用セットに変換
-  const hoveredPathSet = new Set<number>();
-  const hoveredEdgeSet = new Set<string>();
-  let hoveredLandingNodeId: number | null = null;
-  if (hoveredRouteId != null) {
-    const info = routeInfos.find(b => b.id === hoveredRouteId);
-    if (info) {
-      info.path.forEach(id => hoveredPathSet.add(id));
-      hoveredLandingNodeId = info.landingNodeId;
-      const currentPlayerPos = players[currentPlayerIndex]?.position;
-      if (currentPlayerPos !== undefined) {
-        const fullPath = [currentPlayerPos, ...info.path];
-        for (let i = 0; i < fullPath.length - 1; i++) {
-          const u = fullPath[i];
-          const v = fullPath[i + 1];
-          hoveredEdgeSet.add(`${u}-${v}`);
-          hoveredEdgeSet.add(`${v}-${u}`);
+  // ------------------------------------------------
+  // ホバードルートのハイライト用セット（ホバー中のルートが変わった時だけ再計算）
+  // ------------------------------------------------
+  const { hoveredPathSet, hoveredEdgeSet, hoveredLandingNodeId } = useMemo(() => {
+    const pathSet = new Set<number>();
+    const edgeSet = new Set<string>();
+    let landingNodeId: number | null = null;
+
+    if (hoveredRouteId != null) {
+      const info = routeInfos.find(b => b.id === hoveredRouteId);
+      if (info) {
+        info.path.forEach(id => pathSet.add(id));
+        landingNodeId = info.landingNodeId;
+        const currentPlayerPos = players[currentPlayerIndex]?.position;
+        if (currentPlayerPos !== undefined) {
+          const fullPath = [currentPlayerPos, ...info.path];
+          for (let i = 0; i < fullPath.length - 1; i++) {
+            const u = fullPath[i];
+            const v = fullPath[i + 1];
+            edgeSet.add(`${u}-${v}`);
+            edgeSet.add(`${v}-${u}`);
+          }
         }
       }
     }
-  }
+    return { hoveredPathSet: pathSet, hoveredEdgeSet: edgeSet, hoveredLandingNodeId: landingNodeId };
+  }, [hoveredRouteId, routeInfos, players, currentPlayerIndex]);
 
   const nodes = Object.values(map.nodes) as MapNode[];
   const edges = map.edges as MapEdge[];
 
-  // Dynamic ViewBox
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  nodes.forEach(n => {
-    if (n.x < minX) minX = n.x;
-    if (n.x > maxX) maxX = n.x;
-    if (n.y < minY) minY = n.y;
-    if (n.y > maxY) maxY = n.y;
-  });
-  const padding = 50;
-  const vbX = Math.round(minX - padding);
-  const vbY = Math.round(minY - padding);
-  const vbW = Math.round(maxX - minX + padding * 2);
-  const vbH = Math.round(maxY - minY + padding * 2);
-  const dynamicViewBox = `${vbX} ${vbY} ${vbW} ${vbH}`;
+  // マップが切り替わらない限り再計算不要
+  const dynamicViewBox = useMemo(() => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    nodes.forEach(n => {
+      if (n.x < minX) minX = n.x;
+      if (n.x > maxX) maxX = n.x;
+      if (n.y < minY) minY = n.y;
+      if (n.y > maxY) maxY = n.y;
+    });
+    const padding = 50;
+    return `${Math.round(minX - padding)} ${Math.round(minY - padding)} ${Math.round(maxX - minX + padding * 2)} ${Math.round(maxY - minY + padding * 2)}`;
+  }, [nodes]);
+
+  // 採掘確率は minedNodes 変更時のみ再計算
+  const miningChanceCache = useMemo(() => {
+    const cache: Record<number, number> = {};
+    nodes.forEach(n => {
+      if (n.type === 'property' && !minedNodes[n.id]) {
+        cache[n.id] = calcMiningChance(n.id, minedNodes, map);
+      }
+    });
+    return cache;
+  }, [nodes, minedNodes, map]);
 
   const currentPlayer = players[currentPlayerIndex];
 
@@ -321,7 +327,7 @@ export function TreasureBoard({ isMobile }: { isMobile?: boolean }) {
 
                       {/* Dowsing Glow */}
                       {!miningRecord && node.type === 'property' && (() => {
-                        const chance = calcMiningChance(node.id, minedNodes, map);
+                        const chance = miningChanceCache[node.id] ?? 0;
                         if (chance <= 0.25) return null;
                         const intensity = (chance - 0.25) / 0.75;
                         const maxOpacity = 0.4 + (0.5 * intensity);

@@ -1,10 +1,34 @@
-import type { GameSettings, LobbyPlayer, GameMap } from './types';
-import type { TreasureGameState, TreasurePlayer, MiningRecord, GameToast } from './treasureTypes';
-import { COLOR_HEX } from './types';
-import { GAME_MAP } from './mapData';
+import type { GameSettings, LobbyPlayer, GameMap, PlayerColor } from './types';
+import type { TreasureGameState, TreasurePlayer, MiningRecord, GameToast, ActiveEffect } from './treasureTypes';
+import { COLOR_HEX, PLAYER_COLORS } from './types';
 import { getTreasureMap } from './treasureMaps';
-import { PLAYER_COLORS } from './types';
-import { calcAllRoutes, rollDice } from './engine';
+import { calcAllRoutes, rollDice, type RouteInfo } from './engine';
+import { getRandomCard } from './cardDefs';
+
+// ==========================================
+// エンジン内部型定義
+// ==========================================
+
+/**
+ * エンジン関数が受け取る Zustand ストア操作関数の型エイリアス。
+ * TreasureStoreState を直接参照すると循環インポートになるため、
+ * エンジンが実際に参照するフィールドを明示的に定義する。
+ */
+interface EngineState extends TreasureGameState {
+    routeInfos: RouteInfo[];
+    hoveredRouteId: string | null;
+    isRollingDice: boolean;
+    rollingDiceDisplay: number | null;
+}
+
+type EngineSet = (partial: Partial<EngineState> | ((s: EngineState) => Partial<EngineState>)) => void;
+type EngineGet = () => EngineState;
+
+/** ルートチャンク内部の一時型 */
+interface MovementChunk {
+    path: number[];
+    landingNodeId: number;
+}
 
 // ==========================================
 // Initialization
@@ -94,7 +118,7 @@ export function createInitialTreasureState(
 // ==========================================
 
 /** トーストを追加し3秒後に自動削除する。 */
-function pushToast(set: any, _get: any, toast: Omit<GameToast, 'id'>) {
+function pushToast(set: EngineSet, _get: EngineGet, toast: Omit<GameToast, 'id'>) {
     const toastId = `toast_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const newToast: GameToast = { ...toast, id: toastId };
     set((s: TreasureGameState) => ({ toasts: [...s.toasts, newToast] }));
@@ -103,13 +127,13 @@ function pushToast(set: any, _get: any, toast: Omit<GameToast, 'id'>) {
     }, 3000);
 }
 
-export function pushLog(set: any, _get: any, entry: Omit<import('./treasureTypes').GameLogEntry, 'id' | 'timestamp'>) {
+export function pushLog(set: EngineSet, _get: EngineGet, entry: Omit<import('./treasureTypes').GameLogEntry, 'id' | 'timestamp'>) {
     const newLog: import('./treasureTypes').GameLogEntry = {
         ...entry,
         id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         timestamp: Date.now()
     };
-    set((s: TreasureGameState) => {
+    set((s: EngineState) => {
         const next = [...s.gameLogs, newLog];
         return { gameLogs: next.slice(-50) };
     });
@@ -129,7 +153,7 @@ export const BASE_MINING_CHANCE = 0.25;
 export function calcMiningChance(
     nodeId: number,
     minedNodes: Record<number, MiningRecord>,
-    gameMap: GameMap = GAME_MAP
+    gameMap: GameMap
 ): number {
     const node = gameMap.nodes[nodeId];
     if (!node) return 0;
@@ -148,7 +172,7 @@ export function calcMiningChance(
 export function performMining(
     nodeId: number,
     minedNodes: Record<number, MiningRecord>,
-    gameMap: GameMap = GAME_MAP
+    gameMap: GameMap
 ): { success: boolean, type: 'normal' | 'rare' | 'trap' | 'empty' | 'fail' } {
     if (minedNodes[nodeId]) {
         return { success: false, type: 'empty' }; // Already mined
@@ -235,7 +259,7 @@ export function checkTreasureGameOver(state: TreasureGameState): TreasurePlayer 
     return null;
 }
 
-export function advanceTreasureTurn(set: any, get: any) {
+export function advanceTreasureTurn(set: EngineSet, get: EngineGet) {
     const s = get();
 
     const winner = checkTreasureGameOver(s);
@@ -275,7 +299,7 @@ export function advanceTreasureTurn(set: any, get: any) {
 
     // まひ状態のプレーヤーはターンスキップ
     const nextPlayer = players[nextIndex];
-    const isParalyzed = nextPlayer.activeEffects.some((e: any) => e.type === 'paralyzed');
+    const isParalyzed = nextPlayer.activeEffects.some((e: ActiveEffect) => e.type === 'paralyzed');
     if (isParalyzed) {
         // ターンスキップ（次の人へ）
         setTimeout(() => advanceTreasureTurn(set, get), 800);
@@ -292,17 +316,17 @@ export function advanceTreasureTurn(set: any, get: any) {
 // Main Turn Action Logic
 // ==========================================
 
-export function _handleTreasureRouteSelection(set: any, get: any, routeId: string) {
+export function _handleTreasureRouteSelection(set: EngineSet, get: EngineGet, routeId: string) {
     const s = get();
     if (s.phase !== 'route_selection') return;
 
-    const route = s.routeInfos.find((r: any) => r.id === routeId);
+    const route = s.routeInfos.find((r: RouteInfo) => r.id === routeId);
     if (!route) return;
 
     _executeMovementChunk(set, get, route.path, route.landingNodeId);
 }
 
-function _executeMovementChunk(set: any, get: any, fullPath: number[], landingNodeId: number) {
+function _executeMovementChunk(set: EngineSet, get: EngineGet, fullPath: number[], landingNodeId: number) {
     const s = get();
     const player = s.players[s.currentPlayerIndex];
     let stealTargets: TreasurePlayer[] = [];
@@ -355,7 +379,7 @@ function _executeMovementChunk(set: any, get: any, fullPath: number[], landingNo
     }
 }
 
-function _handleIntermediateStop(set: any, get: any) {
+function _handleIntermediateStop(set: EngineSet, get: EngineGet) {
     const s = get();
     const player = s.players[s.currentPlayerIndex];
     const chunkPath = s.movingPath;
@@ -395,7 +419,7 @@ function _handleIntermediateStop(set: any, get: any) {
     }
 }
 
-function _finishTreasureMovement(set: any, get: any, route: any) {
+function _finishTreasureMovement(set: EngineSet, get: EngineGet, route: MovementChunk) {
     const s = get();
     const player = s.players[s.currentPlayerIndex];
 
@@ -468,7 +492,7 @@ function _finishTreasureMovement(set: any, get: any, route: any) {
 
     // 封印状態の場合採掘スキップ
     const currentP = players.find((p: TreasurePlayer) => p.id === player.id)!;
-    const isSealed = currentP.activeEffects.some((e: any) => e.type === 'sealed');
+    const isSealed = currentP.activeEffects.some((e: ActiveEffect) => e.type === 'sealed');
 
     const mineResult = performMining(landingNodeId, s.minedNodes, s.map);
     if (mineResult.type !== 'empty' && !isSealed) {
@@ -485,7 +509,7 @@ function _finishTreasureMovement(set: any, get: any, route: any) {
 // CPU Logic
 // ==========================================
 
-export function _cpuTreasureTurn(set: any, get: any) {
+export function _cpuTreasureTurn(set: EngineSet, get: EngineGet) {
     const s = get();
     if (s.phase !== 'playing') return;
 
@@ -518,8 +542,9 @@ export function _cpuTreasureTurn(set: any, get: any) {
             clearInterval(timer);
             let diceValue = rollDice();
             const s2 = get();
-            const hasDice1 = s2.players[s2.currentPlayerIndex].activeEffects.some((e: any) => e.type === 'dice_1');
-            const hasDice10 = s2.players[s2.currentPlayerIndex].activeEffects.some((e: any) => e.type === 'dice_10');
+            const currentPlayerEffects = s2.players[s2.currentPlayerIndex].activeEffects;
+            const hasDice1 = currentPlayerEffects.some((e: ActiveEffect) => e.type === 'dice_1');
+            const hasDice10 = currentPlayerEffects.some((e: ActiveEffect) => e.type === 'dice_10');
             if (hasDice1) diceValue = 1;
             if (hasDice10) diceValue = 10;
 
@@ -618,7 +643,7 @@ export function _cpuTreasureTurn(set: any, get: any) {
  * 旧: phase='mining_result' に置きユーザー待機 → 新: 即座に遷移＋トースト表示。
  */
 function _resolveMiningResult(
-    set: any, get: any,
+    set: EngineSet, get: EngineGet,
     nodeId: number,
     type: 'normal' | 'rare' | 'trap' | 'empty' | 'fail'
 ) {
@@ -631,7 +656,13 @@ function _resolveMiningResult(
     else if (type === 'trap') newScore = Math.max(0, newScore - 1);
 
     const minedNodes = { ...s.minedNodes };
-    minedNodes[nodeId] = { playerId: type === 'fail' ? null : player.id, type };
+    // 'empty' は performMining が感知する前に定豉されるが、
+    // _resolveMiningResult は empty 以外の型でのみ呼ばれる（caller のガードがある）
+    if (type !== 'fail') {
+        minedNodes[nodeId] = { playerId: player.id, type: type as 'normal' | 'rare' | 'trap' };
+    } else {
+        minedNodes[nodeId] = { playerId: null, type: 'fail' };
+    }
 
     const players = s.players.map((p: TreasurePlayer) =>
         p.id === player.id ? { ...p, treasures: newScore } : p
@@ -643,7 +674,7 @@ function _resolveMiningResult(
         : type === 'rare' ? `所持数 ${newScore}（2アップ）`
             : type === 'trap' ? (newScore < player.treasures ? `所持数 ${newScore}（1減）` : '元々お宝なし…')
                 : 'ハズレ！何も見つからなかった';
-    const playerColor = COLOR_HEX[player.color as import('./types').PlayerColor] ?? '#fff';
+    const playerColor = COLOR_HEX[player.color as PlayerColor] ?? '#fff';
 
     set({
         players,
@@ -658,7 +689,7 @@ function _resolveMiningResult(
 /**
  * カード取得結果を解決しトーストを発行する。
  */
-function _resolveCardResult(set: any, get: any) {
+function _resolveCardResult(set: EngineSet, get: EngineGet) {
     const s = get();
     const player = s.players[s.currentPlayerIndex];
     const card = getRandomCard();
@@ -686,7 +717,7 @@ function _resolveCardResult(set: any, get: any) {
 
 /** 結果をステートに反映し、更新後のplayersを返す。 */
 function _applyStealOutcome(
-    set: any, get: any,
+    set: EngineSet, get: EngineGet,
     battle: NonNullable<TreasureGameState['currentStealBattle']>
 ): { success: boolean; isCounter: boolean; substituteUsed: boolean } {
     const s = get();
@@ -713,7 +744,7 @@ function _applyStealOutcome(
 
 /** 略奕結果に応じたトーストを発行する。 */
 function pushStealToast(
-    set: any, get: any,
+    set: EngineSet, get: EngineGet,
     battle: NonNullable<TreasureGameState['currentStealBattle']>,
     result: { success: boolean; isCounter: boolean; substituteUsed: boolean }
 ) {
@@ -740,53 +771,30 @@ function pushStealToast(
         message = '繰を保った...';
     }
 
-    pushToast(set, get, { category: 'steal', emoji, title, message, playerColor: COLOR_HEX[attacker.color as import('./types').PlayerColor] ?? '#fff' });
+    pushToast(set, get, { category: 'steal', emoji, title, message, playerColor: COLOR_HEX[attacker.color as PlayerColor] ?? '#fff' });
     pushLog(set, get, {
         text: `${title} ${message}`,
         emoji,
-        color: COLOR_HEX[attacker.color as import('./types').PlayerColor] ?? '#ccc',
+        color: COLOR_HEX[attacker.color as PlayerColor] ?? '#ccc',
     });
 }
 
-// 以下はストアから呼ばれるスタブ。
-// ユーザーの確認クリックを待たずエンジン内部で即座に解決するようにしたため、
-// これらの関数は現在未使用だが将来の履歴表示など向けに外部履歴として履歴をそのまま公開する。
+// toast 通知へ移行済みのためユーザー確認ステップは不要。
+// 後方互換のため Store から呼ばれるが実際には何もしない。
+export function _acknowledgeMining(_set: EngineSet, _get: EngineGet) { /* no-op */ }
+export function _acknowledgeSteal(_set: EngineSet, _get: EngineGet) { /* no-op */ }
+export function _acknowledgeCard(_set: EngineSet, _get: EngineGet) { /* no-op */ }
 
-export function _acknowledgeMining(_set: any, _get: any) { /* no-op: engine resolves immediately */ }
-export function _acknowledgeSteal(_set: any, _get: any) { /* no-op: engine resolves immediately */ }
-export function _acknowledgeCard(_set: any, _get: any) { /* no-op: engine resolves immediately */ }
-
-function getRandomCard(): import('./treasureTypes').Card {
-    const types: import('./treasureTypes').CardType[] = ['power_up', 'substitute', 'seal', 'blow_away', 'paralysis', 'phone_fraud', 'dice_1', 'dice_10'];
-    const type = types[Math.floor(Math.random() * types.length)];
-    const cardData: Record<import('./treasureTypes').CardType, { name: string; description: string; isPassive: boolean }> = {
-        'power_up': { name: '略奪のお守り', description: '所持中は略奪成功率+15%', isPassive: true },
-        'substitute': { name: '身代わり人形', description: '略奪された時に1回だけ無効化（消費）', isPassive: true },
-        'seal': { name: '封印のツボ', description: '対象を3ターン採掘不可にする', isPassive: false },
-        'blow_away': { name: 'ぶっ飛ばしハンマー', description: '対象をランダムワープさせる', isPassive: false },
-        'paralysis': { name: 'ビリビリ罠', description: '対象を1回休みにする', isPassive: false },
-        'phone_fraud': { name: '電話詐欺カード', description: '指定した一人からお宝を奪う（同じマス判定）', isPassive: false },
-        'dice_1': { name: '1マスカード', description: '次のサイコロが必ず1になる', isPassive: false },
-        'dice_10': { name: '10マスカード', description: '次のサイコロが必ず10になる', isPassive: false },
-    };
-    const data = cardData[type];
-    return {
-        id: `card_${Math.random().toString(36).substr(2, 9)}`,
-        type,
-        name: data.name,
-        description: data.description,
-        isPassive: data.isPassive,
-    };
-}
+// getRandomCard は cardDefs.ts に移動済み
 
 // ==========================================
 // Card Usage Logic
 // ==========================================
 
-export function _useCard(set: any, get: any, cardId: string, targetPlayerId?: string) {
+export function _useCard(set: EngineSet, get: EngineGet, cardId: string, targetPlayerId?: string) {
     const s = get();
     const player = s.players[s.currentPlayerIndex];
-    const card = player.cards.find((c: import('./treasureTypes').Card) => c.id === cardId);
+    const card = player.cards.find(c => c.id === cardId);
     if (!card) return;
 
     // パッシブカードは手動で使えない
@@ -851,7 +859,7 @@ export function _useCard(set: any, get: any, cardId: string, targetPlayerId?: st
     }
 
     // カードを手札から削除
-    const newCards = player.cards.filter((c: import('./treasureTypes').Card) => c.id !== cardId);
+    const newCards = player.cards.filter(c => c.id !== cardId);
     players[playerIdx] = { ...players[playerIdx], cards: newCards };
 
     set({ players, phase: 'playing' });
@@ -875,14 +883,14 @@ export function _useCard(set: any, get: any, cardId: string, targetPlayerId?: st
     }
 }
 
-export function _setupCardNodeSelection(set: any, _get: any, cardId: string, actionType: 'blow_away', targetPlayerId?: string) {
+export function _setupCardNodeSelection(set: EngineSet, _get: EngineGet, cardId: string, actionType: 'blow_away', targetPlayerId?: string) {
     set({
         phase: 'card_target_selection',
         pendingCardAction: { cardId, actionType, targetPlayerId }
     });
 }
 
-export function _confirmCardNodeSelection(set: any, get: any, nodeId: number) {
+export function _confirmCardNodeSelection(set: EngineSet, get: EngineGet, nodeId: number) {
     const s = get();
     if (s.phase !== 'card_target_selection' || !s.pendingCardAction) return;
 
@@ -898,7 +906,7 @@ export function _confirmCardNodeSelection(set: any, get: any, nodeId: number) {
         }
     }
 
-    const newCards = player.cards.filter((c: import('./treasureTypes').Card) => c.id !== cardId);
+    const newCards = player.cards.filter(c => c.id !== cardId);
     players[playerIdx] = { ...players[playerIdx], cards: newCards };
 
     set({ players, phase: 'playing', pendingCardAction: null });

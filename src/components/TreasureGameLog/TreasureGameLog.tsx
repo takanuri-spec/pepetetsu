@@ -1,104 +1,84 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTreasureStore } from '../../store/treasureStore';
 import { COLOR_HEX } from '../../game/types';
-
-export interface GameLogEntry {
-    id: number;
-    text: string;
-    color?: string;
-    emoji?: string;
-    timestamp: number;
-}
-
-let logIdCounter = 0;
+import type { GameLogEntry } from '../../game/treasureTypes';
 
 /**
  * ゲームの進行状況をチャット風に表示するワイプUI。
- * 右下に常駐し、表示・非表示を切り替えられる。
- * 右下に常駐し、表示・非表示を切り替えられる。
+ * Store の gameLogs を直接参照することで、ローカルな重複管理を排除している。
+ * ターン開始ログのみブラウザ側で補完する（エンジンは採掘・略奪ログを pushLog で書き込む）。
  */
 export function TreasureGameLog({ isMobile }: { isMobile?: boolean }) {
-    const { players, currentPlayerIndex, phase, currentMiningResult, currentStealBattle, currentCardResult, gameLogs = [] } = useTreasureStore();
-    const [logs, setLogs] = useState<GameLogEntry[]>([]);
+    const { players, currentPlayerIndex, phase, gameLogs, currentCardResult } = useTreasureStore();
+    const [displayLogs, setDisplayLogs] = useState<GameLogEntry[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const prevPhaseRef = useRef(phase);
 
-    const addLog = (text: string, color?: string, emoji?: string) => {
-        setLogs(prev => {
-            const next = [...prev, { id: logIdCounter++, text, color, emoji, timestamp: Date.now() }];
-            // 最大50件に制限
-            return next.slice(-50);
-        });
-    };
-
-    // フェーズ変化を監視してログを追加
+    // ターン開始・カード取得など、エンジンが pushLog しないイベントをここで補完する
     useEffect(() => {
         const prev = prevPhaseRef.current;
         prevPhaseRef.current = phase;
 
         const player = players[currentPlayerIndex];
         if (!player) return;
+
         const pColor = COLOR_HEX[player.color];
 
-        // ターン開始
+        // ターン開始（playing への遷移でのみ）
         if (prev !== 'playing' && phase === 'playing') {
-            addLog(`${player.name} のターン`, pColor, '🎯');
+            setDisplayLogs(prev => {
+                const entry: GameLogEntry = {
+                    id: `local_${Date.now()}`,
+                    text: `${player.name} のターン`,
+                    color: pColor,
+                    emoji: '🎯',
+                    timestamp: Date.now(),
+                };
+                return [...prev, entry].slice(-50);
+            });
         }
 
-        // 採掘結果
-        if (phase === 'mining_result' && currentMiningResult) {
-            const typeMap: Record<string, { text: string; emoji: string }> = {
-                'normal': { text: 'お宝を発見！(+1)', emoji: '💎' },
-                'rare': { text: 'レアなお宝！(+2)', emoji: '🌟' },
-                'trap': {
-                    text: player.treasures === 0 ? '罠にかかったが元々お宝を持っていなかった' : '罠にかかった...(-1)',
-                    emoji: '💣'
-                },
-                'fail': { text: '何も見つからなかった', emoji: '💦' },
-                'empty': { text: 'すでに掘り尽くされている', emoji: '🕳️' },
-            };
-            const info = typeMap[currentMiningResult.type] || { text: '採掘', emoji: '⛏️' };
-            addLog(`${player.name}: ${info.text}`, pColor, info.emoji);
-        }
-
-        // 略奪結果
-        if (phase === 'steal_result' && currentStealBattle) {
-            const attacker = players.find(p => p.id === currentStealBattle.attackerId);
-            const target = players.find(p => p.id === currentStealBattle.targetId);
-            if (attacker && target) {
-                if (currentStealBattle.substituteUsed) {
-                    addLog(`${target.name} の身代わり人形が略奪を防いだ！`, COLOR_HEX[target.color], '🧸');
-                } else if (currentStealBattle.success) {
-                    addLog(`${attacker.name} が ${target.name} からお宝を略奪！`, COLOR_HEX[attacker.color], '⚔️');
-                } else if (currentStealBattle.isCounter) {
-                    addLog(`${target.name} が返り討ち！`, COLOR_HEX[target.color], '🛡️');
-                } else {
-                    addLog(`${attacker.name} の略奪失敗`, '#888', '💨');
-                }
-            }
-        }
-
-        // カード取得
+        // カード取得（エンジン側でログを書かないためここで補完）
         if (phase === 'card_result' && currentCardResult) {
-            addLog(`${player.name}: 🃏${currentCardResult.card.name} をゲット！`, pColor, '🃏');
+            setDisplayLogs(prev => {
+                const entry: GameLogEntry = {
+                    id: `card_${Date.now()}`,
+                    text: `${player.name}: 🃏${currentCardResult.card.name} をゲット！`,
+                    color: pColor,
+                    emoji: '🃏',
+                    timestamp: Date.now(),
+                };
+                return [...prev, entry].slice(-50);
+            });
         }
 
-        // ゲームオーバー
+        // ゲーム終了
         if (phase === 'game_over') {
-            addLog('🏆 ゲーム終了！', 'gold', '👑');
+            setDisplayLogs(prev => {
+                const entry: GameLogEntry = {
+                    id: `gameover_${Date.now()}`,
+                    text: '🏆 ゲーム終了！',
+                    color: 'gold',
+                    emoji: '👑',
+                    timestamp: Date.now(),
+                };
+                return [...prev, entry].slice(-50);
+            });
         }
-    }, [phase, currentMiningResult, currentStealBattle, currentCardResult]);
+    }, [phase, currentPlayerIndex, players, currentCardResult]);
 
-    // Combine local logs and global gameLogs, sort by timestamp
-    const combinedLogs = [...logs, ...gameLogs].sort((a, b) => a.timestamp - b.timestamp).slice(-50);
+    // Store の gameLogs（採掘・略奪など）とローカル補完ログを時刻順にマージ
+    const combinedLogs = [...displayLogs, ...gameLogs]
+        .sort((a, b) => a.timestamp - b.timestamp)
+        .slice(-50);
 
-    // 自動スクロール
+    // ログが更新されたら末尾にスクロール
     useEffect(() => {
-        if (scrollRef.current) {
+        if (scrollRef.current && isOpen) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
-    }, [combinedLogs]);
+    }, [combinedLogs, isOpen]);
 
     return (
         <div style={{

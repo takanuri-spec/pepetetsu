@@ -61,8 +61,16 @@ export function Lobby() {
 
   const { settings, lobbyPlayers, updateSettings, updateLobbyPlayers, startGame } = state;
 
+  /** 名前の最大文字数を制限して前後の空白を除去する（UI 健全性の担保） */
+  function sanitizePlayerName(name: string): string {
+    return name.trim().slice(0, 20);
+  }
+
   function updatePlayer(index: number, patch: Partial<LobbyPlayer>) {
-    const updated = lobbyPlayers.map((p, i) => (i === index ? { ...p, ...patch } : p));
+    const sanitized = patch.name !== undefined
+      ? { ...patch, name: sanitizePlayerName(patch.name) }
+      : patch;
+    const updated = lobbyPlayers.map((p, i) => (i === index ? { ...p, ...sanitized } : p));
     updateLobbyPlayers(updated);
   }
 

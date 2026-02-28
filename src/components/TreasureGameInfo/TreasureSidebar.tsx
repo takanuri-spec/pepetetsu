@@ -1,6 +1,7 @@
 import { useTreasureStore } from '../../store/treasureStore';
 import { COLOR_HEX } from '../../game/types';
 import { TREASURE_MAPS } from '../../game/treasureMaps';
+import { CARD_EMOJI } from '../../game/cardDefs';
 
 export function TreasureSidebar() {
   const state = useTreasureStore();
@@ -16,15 +17,7 @@ export function TreasureSidebar() {
   const minedCount = Object.keys(state.minedNodes).length;
   const remainingCount = totalMinable - minedCount;
 
-  const cardEmoji: Record<string, string> = {
-    'power_up': '⚔️',
-    'substitute': '🧸',
-    'seal': '🏺',
-    'blow_away': '🔨',
-    'phone_fraud': '📱',
-    'dice_1': '1️⃣',
-    'dice_10': '🔟',
-  };
+  // CARD_EMOJI は cardDefs.ts から import 済み
 
   function renderTreasures(count: number) {
     if (count === 0) return <span style={{ color: '#555', fontSize: 13 }}>—</span>;
@@ -202,7 +195,7 @@ export function TreasureSidebar() {
                           opacity: card.isPassive ? 0.65 : 1
                         }}
                       >
-                        {cardEmoji[card.type] ?? '🃏'}
+                        {CARD_EMOJI[card.type as keyof typeof CARD_EMOJI] ?? '🃏'}
                       </span>
                     ))}
                   </div>
