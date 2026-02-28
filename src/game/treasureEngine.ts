@@ -211,10 +211,11 @@ export function checkTreasureGameOver(state: TreasureGameState): TreasurePlayer 
     const winnerByPoints = state.players.find(p => p.treasures >= targetTreasures);
     if (winnerByPoints) return winnerByPoints;
 
-    const totalNodes = Object.keys(state.map.nodes).length;
+    const propertyNodes = Object.values(state.map.nodes).filter(n => n.type === 'property');
+    const totalMinable = propertyNodes.length;
     const minedCount = Object.keys(state.minedNodes).length;
 
-    if (minedCount >= totalNodes - 1) { // Minus 1 for start node
+    if (totalMinable > 0 && minedCount >= totalMinable) {
         const sorted = [...state.players].sort((a, b) => b.treasures - a.treasures);
         return sorted[0];
     }
