@@ -8,7 +8,9 @@ export type CardType =
     | 'seal' // 封印（指定プレイヤーは5ターン採掘不可）
     | 'blow_away' // ぶっ飛ばし（ランダムワープ）
     | 'paralysis' // まひ（1回休み）
-    | 'time_machine'; // タイムマシン（現在の採掘済みマスを復活）
+    | 'phone_fraud' // 電話詐欺（指定プレイヤー1人から奪取）
+    | 'dice_1' // 1マスカード（サイコロが1になる）
+    | 'dice_10'; // 10マスカード（サイコロが10になる）
 
 export interface Card {
     id: string; // ユニークID (ex: card_0)
@@ -18,7 +20,7 @@ export interface Card {
     isPassive: boolean; // 持っているだけで効果があるかどうか
 }
 
-export type ActiveEffectType = 'sealed' | 'paralyzed';
+export type ActiveEffectType = 'sealed' | 'paralyzed' | 'dice_1' | 'dice_10';
 
 export interface ActiveEffect {
     type: ActiveEffectType;
@@ -99,7 +101,7 @@ export interface TreasureGameState {
         type: 'pass_by' | 'same_node';
     } | null;
 
-    pendingCardAction: { cardId: string, actionType: 'blow_away' | 'time_machine', targetPlayerId?: string } | null;
+    pendingCardAction: { cardId: string, actionType: 'blow_away', targetPlayerId?: string } | null;
 
     diceValue: number | null;
     movingPath: number[];

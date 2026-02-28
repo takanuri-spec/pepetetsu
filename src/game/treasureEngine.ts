@@ -469,7 +469,7 @@ export function _cpuTreasureTurn(set: any, get: any) {
         // 共通：トップをお宝数で特定し、最優先で妨害する
         opponents = opponents.sort((a: TreasurePlayer, b: TreasurePlayer) => b.treasures - a.treasures);
 
-        if (card.type === 'time_machine') {
+        if (card.type === 'dice_1' || card.type === 'dice_10') {
             _useCard(set, get, card.id);
         } else if (opponents.length > 0) {
             _useCard(set, get, card.id, opponents[0].id);
@@ -483,9 +483,13 @@ export function _cpuTreasureTurn(set: any, get: any) {
         ticks++;
         if (ticks >= 10) {
             clearInterval(timer);
-            const diceValue = rollDice();
-
+            let diceValue = rollDice();
             const s2 = get();
+            const hasDice1 = s2.players[s2.currentPlayerIndex].activeEffects.some((e: any) => e.type === 'dice_1');
+            const hasDice10 = s2.players[s2.currentPlayerIndex].activeEffects.some((e: any) => e.type === 'dice_10');
+            if (hasDice1) diceValue = 1;
+            if (hasDice10) diceValue = 10;
+
             const currentPlayer = s2.players[s2.currentPlayerIndex];
             const routeInfos = calcAllRoutes(currentPlayer.position, diceValue, s2.map, -1);
 
@@ -761,7 +765,7 @@ export function _acknowledgeSteal(_set: any, _get: any) { /* no-op: engine resol
 export function _acknowledgeCard(_set: any, _get: any) { /* no-op: engine resolves immediately */ }
 
 function getRandomCard(): import('./treasureTypes').Card {
-    const types: import('./treasureTypes').CardType[] = ['power_up', 'substitute', 'seal', 'blow_away', 'paralysis', 'time_machine'];
+    const types: import('./treasureTypes').CardType[] = ['power_up', 'substitute', 'seal', 'blow_away', 'paralysis', 'phone_fraud', 'dice_1', 'dice_10'];
     const type = types[Math.floor(Math.random() * types.length)];
     const cardData: Record<import('./treasureTypes').CardType, { name: string; description: string; isPassive: boolean }> = {
         'power_up': { name: '略奪のお守り', description: '所持中は略奪成功率+15%', isPassive: true },
@@ -769,7 +773,9 @@ function getRandomCard(): import('./treasureTypes').Card {
         'seal': { name: '封印のツボ', description: '対象を3ターン採掘不可にする', isPassive: false },
         'blow_away': { name: 'ぶっ飛ばしハンマー', description: '対象をランダムワープさせる', isPassive: false },
         'paralysis': { name: 'ビリビリ罠', description: '対象を1回休みにする', isPassive: false },
-        'time_machine': { name: 'タイムマシン', description: '自分の採掘済マス1つを未採掘に戻す', isPassive: false },
+        'phone_fraud': { name: '電話詐欺カード', description: '指定した一人からお宝を奪う（同じマス判定）', isPassive: false },
+        'dice_1': { name: '1マスカード', description: '次のサイコロが必ず1になる', isPassive: false },
+        'dice_10': { name: '10マスカード', description: '次のサイコロが必ず10になる', isPassive: false },
     };
     const data = cardData[type];
     return {
@@ -827,8 +833,25 @@ export function _useCard(set: any, get: any, cardId: string, targetPlayerId?: st
             };
             break;
         }
-        case 'time_machine': {
-            // Node selection deferred
+        case 'phone_fraud': {
+            if (!targetPlayerId) return;
+            const targetIdx = players.findIndex(p => p.id === targetPlayerId);
+            if (targetIdx < 0) return;
+            // 処理はカード削除後に実行
+            break;
+        }
+        case 'dice_1': {
+            players[playerIdx] = {
+                ...players[playerIdx],
+                activeEffects: [...players[playerIdx].activeEffects, { type: 'dice_1', durationTurns: 1 }]
+            };
+            break;
+        }
+        case 'dice_10': {
+            players[playerIdx] = {
+                ...players[playerIdx],
+                activeEffects: [...players[playerIdx].activeEffects, { type: 'dice_10', durationTurns: 1 }]
+            };
             break;
         }
         default:
@@ -840,9 +863,27 @@ export function _useCard(set: any, get: any, cardId: string, targetPlayerId?: st
     players[playerIdx] = { ...players[playerIdx], cards: newCards };
 
     set({ players, phase: 'playing' });
+
+    if (card.type === 'phone_fraud' && targetPlayerId) {
+        const tIdx = players.findIndex(p => p.id === targetPlayerId);
+        if (tIdx >= 0) {
+            const stealTarget = players[tIdx];
+            const stealResult = performSteal('same_node', players[playerIdx], stealTarget);
+            const battle = {
+                attackerId: player.id,
+                targetId: stealTarget.id,
+                success: stealResult.success,
+                isCounter: stealResult.isCounter,
+                substituteUsed: stealResult.substituteUsed,
+                type: 'same_node' as const
+            };
+            const out = _applyStealOutcome(set, get, battle);
+            pushStealToast(set, get, battle, out);
+        }
+    }
 }
 
-export function _setupCardNodeSelection(set: any, _get: any, cardId: string, actionType: 'blow_away' | 'time_machine', targetPlayerId?: string) {
+export function _setupCardNodeSelection(set: any, _get: any, cardId: string, actionType: 'blow_away', targetPlayerId?: string) {
     set({
         phase: 'card_target_selection',
         pendingCardAction: { cardId, actionType, targetPlayerId }
@@ -863,10 +904,6 @@ export function _confirmCardNodeSelection(set: any, get: any, nodeId: number) {
         if (targetIdx >= 0) {
             players[targetIdx] = { ...players[targetIdx], position: nodeId };
         }
-    } else if (actionType === 'time_machine') {
-        const newMinedNodes = { ...s.minedNodes };
-        delete newMinedNodes[nodeId];
-        set({ minedNodes: newMinedNodes });
     }
 
     const newCards = player.cards.filter((c: import('./treasureTypes').Card) => c.id !== cardId);

@@ -47,7 +47,9 @@ const CARD_EMOJI: Record<string, string> = {
   'seal': '🏺',
   'blow_away': '🔨',
   'paralysis': '⚡',
-  'time_machine': '⌚',
+  'phone_fraud': '📱',
+  'dice_1': '1️⃣',
+  'dice_10': '🔟',
 };
 
 // マウス座標の角度をもとに、直前ノードから対象ノードへ向かうルートの中で最も近いものを選択する
@@ -578,14 +580,14 @@ export function TreasureBoard({ isMobile }: { isMobile?: boolean }) {
             {selectedCard && phase === 'playing' && (
               <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
-                  {selectedCard.type === 'time_machine' ? '「タイムマシン」を使う？' : '誰に使う？'}
+                  {selectedCard.type === 'dice_1' || selectedCard.type === 'dice_10' ? '自身に使います' : '誰に使う？'}
                 </div>
-                {selectedCard.type === 'time_machine' ? (
+                {selectedCard.type === 'dice_1' || selectedCard.type === 'dice_10' ? (
                   <button
                     className="btn btn-primary btn-sm"
                     style={{ width: '100%' }}
                     onClick={() => {
-                      state.setupCardNodeSelection(selectedCard.id, 'time_machine');
+                      state.useCard(selectedCard.id);
                       closeCardPopup();
                     }}
                   >使う！</button>

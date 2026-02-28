@@ -33,7 +33,7 @@ export interface TreasureStoreState extends TreasureGameState {
     acknowledgeSteal: () => void;
     acknowledgeCard: () => void;
     useCard: (cardId: string, targetPlayerId?: string) => void;
-    setupCardNodeSelection: (cardId: string, actionType: 'blow_away' | 'time_machine', targetPlayerId?: string) => void;
+    setupCardNodeSelection: (cardId: string, actionType: 'blow_away', targetPlayerId?: string) => void;
     confirmCardNodeSelection: (nodeId: number) => void;
     cancelCardSelection: () => void;
     resetGame: () => void;
@@ -106,9 +106,15 @@ export const useTreasureStore = create<TreasureStoreState>((set, get) => ({
             ticks++;
             if (ticks >= maxTicks) {
                 clearInterval(timer);
-                const diceValue = rollDice();
+                let diceValue = rollDice();
                 const s2 = get();
                 const currentPlayer = s2.players[s2.currentPlayerIndex];
+
+                const hasDice1 = currentPlayer.activeEffects.some((e: any) => e.type === 'dice_1');
+                const hasDice10 = currentPlayer.activeEffects.some((e: any) => e.type === 'dice_10');
+                if (hasDice1) diceValue = 1;
+                if (hasDice10) diceValue = 10;
+
                 const routeInfos = calcAllRoutes(
                     currentPlayer.position,
                     diceValue,
@@ -156,7 +162,7 @@ export const useTreasureStore = create<TreasureStoreState>((set, get) => ({
         set({ cardPopupPlayerId: null, selectedCardId: null });
     },
 
-    setupCardNodeSelection: (cardId, actionType, targetPlayerId) => {
+    setupCardNodeSelection: (cardId: string, actionType: 'blow_away', targetPlayerId?: string) => {
         _setupCardNodeSelection(set, get, cardId, actionType, targetPlayerId);
         set({ cardPopupPlayerId: null, selectedCardId: null });
     },

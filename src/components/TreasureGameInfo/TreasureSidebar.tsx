@@ -21,8 +21,9 @@ export function TreasureSidebar() {
     'substitute': '🧸',
     'seal': '🏺',
     'blow_away': '🔨',
-    'paralysis': '⚡',
-    'time_machine': '⌚',
+    'phone_fraud': '📱',
+    'dice_1': '1️⃣',
+    'dice_10': '🔟',
   };
 
   function renderTreasures(count: number) {
