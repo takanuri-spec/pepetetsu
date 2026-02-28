@@ -99,6 +99,7 @@ function pushToast(set: any, _get: any, toast: Omit<GameToast, 'id'>) {
     const newToast: GameToast = { ...toast, id: toastId };
     set((s: TreasureGameState) => ({ toasts: [...s.toasts, newToast] }));
     setTimeout(() => {
+        set((s: TreasureGameState) => ({ toasts: s.toasts.filter(t => t.id !== toastId) }));
     }, 3000);
 }
 
