@@ -76,8 +76,9 @@ const INITIAL_STATE: InitialStateSubset = {
     isRollingDice: false,
     rollingDiceDisplay: null,
     pendingMovement: null,
-    pendingStealTargetId: null,
+    pendingStealTargetIds: [],
     toasts: [],
+    gameLogs: [],
     cardPopupPlayerId: null,
     selectedCardId: null,
 };

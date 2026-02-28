@@ -13,7 +13,7 @@ import { calcAllRoutes, rollDice } from './engine';
 export function createInitialTreasureState(
     settings: GameSettings,
     lobbyPlayers: LobbyPlayer[]
-): Omit<TreasureGameState, 'phase' | 'isAnimating' | 'pendingMoves' | 'routeInfos' | 'hoveredRouteId' | 'isRollingDice' | 'rollingDiceDisplay' | 'currentMiningResult' | 'currentStealBattle' | 'currentCardResult' | 'toasts'> {
+): Omit<TreasureGameState, 'phase' | 'isAnimating' | 'pendingMoves' | 'routeInfos' | 'hoveredRouteId' | 'isRollingDice' | 'rollingDiceDisplay' | 'currentMiningResult' | 'currentStealBattle' | 'currentCardResult' | 'toasts' | 'gameLogs'> {
 
     // Enforce at least 4 players. If there's 1 human, add 3 CPUs.
     let finalPlayers = [...lobbyPlayers];
@@ -85,7 +85,7 @@ export function createInitialTreasureState(
         settings,
         pendingCardAction: null,
         pendingMovement: null,
-        pendingStealTargetId: null,
+        pendingStealTargetIds: [],
     };
 }
 
@@ -99,8 +99,19 @@ function pushToast(set: any, _get: any, toast: Omit<GameToast, 'id'>) {
     const newToast: GameToast = { ...toast, id: toastId };
     set((s: TreasureGameState) => ({ toasts: [...s.toasts, newToast] }));
     setTimeout(() => {
-        set((s: TreasureGameState) => ({ toasts: s.toasts.filter(t => t.id !== toastId) }));
     }, 3000);
+}
+
+export function pushLog(set: any, _get: any, entry: Omit<import('./treasureTypes').GameLogEntry, 'id' | 'timestamp'>) {
+    const newLog: import('./treasureTypes').GameLogEntry = {
+        ...entry,
+        id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        timestamp: Date.now()
+    };
+    set((s: TreasureGameState) => {
+        const next = [...s.gameLogs, newLog];
+        return { gameLogs: next.slice(-50) };
+    });
 }
 
 // ==========================================
@@ -293,7 +304,7 @@ export function _handleTreasureRouteSelection(set: any, get: any, routeId: strin
 function _executeMovementChunk(set: any, get: any, fullPath: number[], landingNodeId: number) {
     const s = get();
     const player = s.players[s.currentPlayerIndex];
-    let stealTarget = null;
+    let stealTargets: TreasurePlayer[] = [];
     let stealNodeIndex = -1;
 
     for (let i = 0; i < fullPath.length - 1; i++) {
@@ -301,13 +312,13 @@ function _executeMovementChunk(set: any, get: any, fullPath: number[], landingNo
         const opponentsHere = s.players.filter((p: TreasurePlayer) => p.id !== player.id && p.position === nodeId && p.treasures > 0);
         if (opponentsHere.length > 0) {
             opponentsHere.sort((a: TreasurePlayer, b: TreasurePlayer) => b.treasures - a.treasures);
-            stealTarget = opponentsHere[0];
+            stealTargets = opponentsHere;
             stealNodeIndex = i;
             break;
         }
     }
 
-    if (stealTarget) {
+    if (stealTargets.length > 0) {
         const chunkPath = fullPath.slice(0, stealNodeIndex + 1);
         const remainingPath = fullPath.slice(stealNodeIndex + 1);
 
@@ -318,7 +329,7 @@ function _executeMovementChunk(set: any, get: any, fullPath: number[], landingNo
             routeInfos: [],
             hoveredRouteId: null,
             pendingMovement: { path: remainingPath, landingNodeId: landingNodeId },
-            pendingStealTargetId: stealTarget.id
+            pendingStealTargetIds: stealTargets.map(p => p.id)
         });
 
         const animDuration = chunkPath.length * 380 + 300;
@@ -333,7 +344,7 @@ function _executeMovementChunk(set: any, get: any, fullPath: number[], landingNo
             routeInfos: [],
             hoveredRouteId: null,
             pendingMovement: null,
-            pendingStealTargetId: null
+            pendingStealTargetIds: []
         });
 
         const animDuration = fullPath.length * 380 + 300;
@@ -355,29 +366,31 @@ function _handleIntermediateStop(set: any, get: any) {
     );
     set({ players, movingPath: [], isAnimating: false });
 
-    // Perform pass-by steal
-    const stealTarget = players.find((p: TreasurePlayer) => p.id === s.pendingStealTargetId);
-    if (stealTarget) {
-        const updatedPlayer = players.find((p: TreasurePlayer) => p.id === player.id)!;
-        const stealResult = performSteal('pass_by', updatedPlayer, stealTarget);
-        set({
-            currentStealBattle: {
-                attackerId: player.id,
-                targetId: stealTarget.id,
-                success: stealResult.success,
-                isCounter: stealResult.isCounter,
-                substituteUsed: stealResult.substituteUsed,
-                type: 'pass_by'
-            },
-            phase: 'steal_result'
-        });
-        // 振り止めなしで即座に解決する（確認クリック不要）
-        _resolveIntermediateSteal(set, get);
-    } else {
-        // Fallback
-        if (s.pendingMovement) {
-            _executeMovementChunk(set, get, s.pendingMovement.path, s.pendingMovement.landingNodeId);
+    // Perform pass-by steals
+    if (s.pendingStealTargetIds && s.pendingStealTargetIds.length > 0) {
+        for (const targetId of s.pendingStealTargetIds) {
+            const stealTarget = get().players.find((p: TreasurePlayer) => p.id === targetId);
+            if (stealTarget) {
+                const updatedPlayer = get().players.find((p: TreasurePlayer) => p.id === player.id)!;
+                const stealResult = performSteal('pass_by', updatedPlayer, stealTarget);
+                const battle = {
+                    attackerId: player.id,
+                    targetId: stealTarget.id,
+                    success: stealResult.success,
+                    isCounter: stealResult.isCounter,
+                    substituteUsed: stealResult.substituteUsed,
+                    type: 'pass_by' as const
+                };
+                const applyOut = _applyStealOutcome(set, get, battle);
+                pushStealToast(set, get, battle, applyOut);
+            }
         }
+    }
+
+    // 再開
+    const s2 = get();
+    if (s2.pendingMovement) {
+        _executeMovementChunk(set, get, s2.pendingMovement.path, s2.pendingMovement.landingNodeId);
     }
 }
 
@@ -394,34 +407,53 @@ function _finishTreasureMovement(set: any, get: any, route: any) {
     // 2. Resolve Stealing first!
     const landingNodeId = route.landingNodeId;
 
-    let stealTarget = null;
+    let stealTargets: TreasurePlayer[] = [];
     let stealType: 'same_node' | 'pass_by' | null = null;
     let stealResult = null;
 
     const opponentsHere = players.filter((p: TreasurePlayer) => p.id !== player.id && p.position === landingNodeId && p.treasures > 0);
     if (opponentsHere.length > 0) {
         opponentsHere.sort((a: TreasurePlayer, b: TreasurePlayer) => b.treasures - a.treasures);
-        stealTarget = opponentsHere[0];
+        stealTargets = opponentsHere;
         stealType = 'same_node';
     }
 
-    if (stealTarget && stealType) {
-        const updatedPlayer = players.find((p: TreasurePlayer) => p.id === player.id)!;
-        stealResult = performSteal(stealType, updatedPlayer, stealTarget);
+    if (stealTargets.length > 0 && stealType) {
+        for (const target of stealTargets) {
+            const stealTarget = get().players.find((p: TreasurePlayer) => p.id === target.id);
+            if (!stealTarget) continue;
 
-        set({
-            currentStealBattle: {
+            const updatedPlayer = get().players.find((p: TreasurePlayer) => p.id === player.id)!;
+            stealResult = performSteal(stealType, updatedPlayer, stealTarget);
+
+            const battle = {
                 attackerId: player.id,
                 targetId: stealTarget.id,
                 success: stealResult.success,
                 isCounter: stealResult.isCounter,
                 substituteUsed: stealResult.substituteUsed,
                 type: stealType
-            },
-            phase: 'steal_result'
-        });
-        // 確認クリックなしで即座に解決する
-        _resolveLandingSteal(set, get);
+            };
+            const applyOut = _applyStealOutcome(set, get, battle);
+            pushStealToast(set, get, battle, applyOut);
+        }
+
+        // 略奪が終わったので採掘へ
+        const s2 = get();
+        const currentPlayer = s2.players[s2.currentPlayerIndex];
+        const node = s2.map.nodes[currentPlayer.position];
+        if (node && node.type === 'bonus') {
+            _resolveCardResult(set, get);
+            return;
+        }
+
+        const mineResult = performMining(currentPlayer.position, s2.minedNodes, s2.map);
+        if (mineResult.type !== 'empty') {
+            _resolveMiningResult(set, get, currentPlayer.position, mineResult.type);
+            return;
+        }
+
+        advanceTreasureTurn(set, get);
         return;
     }
 
@@ -649,53 +681,7 @@ function _resolveCardResult(set: any, get: any) {
     advanceTreasureTurn(set, get);
 }
 
-/**
- * 略奕結果を解決しトーストを発行する（着地予定墓での第1当事者組）。
- * pendingMovementがある場合は移動を再開する。
- */
-function _resolveLandingSteal(set: any, get: any) {
-    const s = get();
-    const battle = s.currentStealBattle;
-    if (!battle) return;
 
-    const stealResult = _applyStealOutcome(set, get, battle);
-    pushStealToast(set, get, battle, stealResult);
-
-    // 同一ノード理複が終わった後は採掘の展開へ
-    const s2 = get();
-    const player = s2.players[s2.currentPlayerIndex];
-    const node = s2.map.nodes[player.position];
-    if (node && node.type === 'bonus') {
-        _resolveCardResult(set, get);
-        return;
-    }
-
-    const mineResult = performMining(player.position, s2.minedNodes, s2.map);
-    if (mineResult.type !== 'empty') {
-        _resolveMiningResult(set, get, player.position, mineResult.type);
-        return;
-    }
-
-    advanceTreasureTurn(set, get);
-}
-
-/**
- * 経由地照射の略奕結果を解決する。
- * 結果後は pendingMovement で移動を再開する。
- */
-function _resolveIntermediateSteal(set: any, get: any) {
-    const s = get();
-    const battle = s.currentStealBattle;
-    if (!battle) return;
-
-    const stealResult = _applyStealOutcome(set, get, battle);
-    pushStealToast(set, get, battle, stealResult);
-
-    const s2 = get();
-    if (s2.pendingMovement) {
-        _executeMovementChunk(set, get, s2.pendingMovement.path, s2.pendingMovement.landingNodeId);
-    }
-}
 
 /** 結果をステートに反映し、更新後のplayersを返す。 */
 function _applyStealOutcome(
@@ -754,6 +740,11 @@ function pushStealToast(
     }
 
     pushToast(set, get, { category: 'steal', emoji, title, message, playerColor: COLOR_HEX[attacker.color as import('./types').PlayerColor] ?? '#fff' });
+    pushLog(set, get, {
+        text: `${title} ${message}`,
+        emoji,
+        color: COLOR_HEX[attacker.color as import('./types').PlayerColor] ?? '#ccc',
+    });
 }
 
 // 以下はストアから呼ばれるスタブ。

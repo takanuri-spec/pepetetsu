@@ -112,8 +112,19 @@ export interface TreasureGameState {
     pendingMoves: number;
     isAnimating: boolean;
     pendingMovement: { path: number[], landingNodeId: number } | null;
-    pendingStealTargetId: string | null;
+    pendingStealTargetIds: string[];
 
     // スマホ通知スタイルのトーストキュー（確認クリック不要）
     toasts: GameToast[];
+
+    // ゲーム履歴表示用
+    gameLogs: GameLogEntry[];
+}
+
+export interface GameLogEntry {
+    id: string;
+    text: string;
+    color?: string;
+    emoji?: string;
+    timestamp: number;
 }

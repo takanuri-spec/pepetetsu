@@ -18,7 +18,7 @@ let logIdCounter = 0;
  * 右下に常駐し、表示・非表示を切り替えられる。
  */
 export function TreasureGameLog({ isMobile }: { isMobile?: boolean }) {
-    const { players, currentPlayerIndex, phase, currentMiningResult, currentStealBattle, currentCardResult } = useTreasureStore();
+    const { players, currentPlayerIndex, phase, currentMiningResult, currentStealBattle, currentCardResult, gameLogs = [] } = useTreasureStore();
     const [logs, setLogs] = useState<GameLogEntry[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -90,12 +90,15 @@ export function TreasureGameLog({ isMobile }: { isMobile?: boolean }) {
         }
     }, [phase, currentMiningResult, currentStealBattle, currentCardResult]);
 
+    // Combine local logs and global gameLogs, sort by timestamp
+    const combinedLogs = [...logs, ...gameLogs].sort((a, b) => a.timestamp - b.timestamp).slice(-50);
+
     // 自動スクロール
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
-    }, [logs]);
+    }, [combinedLogs]);
 
     return (
         <div style={{
@@ -129,7 +132,7 @@ export function TreasureGameLog({ isMobile }: { isMobile?: boolean }) {
                 }}
             >
                 {isOpen ? '▼ ログを閉じる' : '📜 ログ'}
-                {!isOpen && logs.length > 0 && (
+                {!isOpen && combinedLogs.length > 0 && (
                     <span style={{
                         background: 'var(--accent)',
                         borderRadius: 10,
@@ -137,7 +140,7 @@ export function TreasureGameLog({ isMobile }: { isMobile?: boolean }) {
                         fontSize: 11,
                         marginLeft: 6
                     }}>
-                        {logs.length}
+                        {combinedLogs.length}
                     </span>
                 )}
             </button>
@@ -157,12 +160,12 @@ export function TreasureGameLog({ isMobile }: { isMobile?: boolean }) {
                         backdropFilter: 'blur(12px)',
                     }}
                 >
-                    {logs.length === 0 ? (
+                    {combinedLogs.length === 0 ? (
                         <div style={{ color: '#666', fontSize: 12, textAlign: 'center', padding: 12 }}>
                             ゲームのログがここに流れます...
                         </div>
                     ) : (
-                        logs.map(entry => (
+                        combinedLogs.map(entry => (
                             <div
                                 key={entry.id}
                                 style={{
