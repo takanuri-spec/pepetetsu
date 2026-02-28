@@ -406,8 +406,13 @@
 @media (max-width: 768px) {
     .lobby-screen {
         overflow-y: auto;
-        min-height: 100dvh;
+        height: 100dvh;
+        display: block;
         -webkit-overflow-scrolling: touch;
+    }
+
+    .lobby-bg {
+        position: fixed;
     }
 
     .lobby-header {
