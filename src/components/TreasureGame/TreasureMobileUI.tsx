@@ -16,7 +16,7 @@ export function TreasureMobileUI() {
     const minedCount = Object.keys(state.minedNodes).length;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', overflow: 'hidden', background: '#0d1b2a', color: '#fff', position: 'relative' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', position: 'fixed', inset: 0, overflow: 'hidden', background: '#0d1b2a', color: '#fff' }}>
 
             {/* ヘッダー (画面上部) */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', zIndex: 10 }}>
