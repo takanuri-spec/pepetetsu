@@ -171,11 +171,15 @@ export function TreasureSidebar() {
                   <span style={{ fontWeight: 600, fontSize: 14, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {player.name}
                   </span>
-                  {player.activeEffects.map((e, i) => (
-                    <span key={i} style={{ fontSize: 11, color: e.type === 'sealed' ? '#ef4444' : '#eab308' }}>
-                      {e.type === 'sealed' ? '🔒' : '⚡'}{e.durationTurns}
-                    </span>
-                  ))}
+                  {player.activeEffects.map((e, i) => {
+                    const emoji = e.type === 'sealed' ? '🔒' : e.type === 'paralyzed' ? '⚡' : e.type === 'dice_1' ? '1️⃣' : '🔟';
+                    const color = e.type === 'sealed' ? '#ef4444' : e.type === 'paralyzed' ? '#eab308' : '#3b82f6';
+                    return (
+                      <span key={i} style={{ fontSize: 11, color }}>
+                        {emoji}{e.durationTurns > 0 ? e.durationTurns : ''}
+                      </span>
+                    );
+                  })}
                 </div>
 
                 {/* お宝行 */}

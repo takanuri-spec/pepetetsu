@@ -86,7 +86,24 @@ export function TreasureMobileUI() {
                         >
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '11px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: COLOR_HEX[player.color], flexShrink: 0 }} />
-                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{player.name}</span>
+                                <span style={{
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    color: player.activeEffects.some(e => e.type === 'sealed') ? '#ef4444' :
+                                        player.activeEffects.some(e => e.type === 'paralyzed') ? '#eab308' : 'inherit'
+                                }}>
+                                    {player.name}
+                                </span>
+                                {player.activeEffects.map((e, i) => {
+                                    const emoji = e.type === 'sealed' ? '🔒' : e.type === 'paralyzed' ? '⚡' : e.type === 'dice_1' ? '1️⃣' : '🔟';
+                                    const color = e.type === 'sealed' ? '#ef4444' : e.type === 'paralyzed' ? '#eab308' : '#3b82f6';
+                                    return (
+                                        <span key={i} style={{ color, flexShrink: 0, fontSize: '9px' }}>
+                                            {emoji}{e.durationTurns > 0 ? e.durationTurns : ''}
+                                        </span>
+                                    );
+                                })}
                             </div>
                             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                                 💎 {player.treasures}
