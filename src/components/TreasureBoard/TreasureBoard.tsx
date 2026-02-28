@@ -614,64 +614,101 @@ export function TreasureBoard({ isMobile }: { isMobile?: boolean }) {
       <AnimatePresence>
         {routePopupNodeId && phase === 'route_selection' && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            drag
+            dragConstraints={svgRef}
+            dragElastic={0.2}
+            dragMomentum={false}
+            initial={{ opacity: 0, scale: 0.8, y: 20, x: '-50%' }}
+            animate={{ opacity: 1, scale: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, scale: 0.8, y: 20, x: '-50%' }}
             style={{
               position: 'absolute',
-              bottom: 80,
+              bottom: 120,
               left: '50%',
-              transform: 'translateX(-50%)',
               zIndex: 200,
-              background: 'var(--surface)',
+              background: 'rgba(22, 33, 62, 0.95)',
               border: `2px solid var(--accent)`,
-              borderRadius: 16,
-              padding: '16px 20px',
-              minWidth: 280,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-              textAlign: 'center'
+              borderRadius: 32, // Pill shape
+              padding: '8px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+              backdropFilter: 'blur(8px)',
+              cursor: 'grab',
+              touchAction: 'none' // Prevent scrolling while dragging popup
             }}
           >
-            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>
-              🔄 複数のルートがあります！
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
-              行き先のマスを何度かタップするか、下のボタンを押してルートを切り替えられます。
+            <div style={{ fontSize: 11, fontWeight: 'bold', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <span>ルート</span>
+              <span>選択</span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => {
-                  const routes = routeInfos.filter(r => r.landingNodeId === routePopupNodeId);
-                  const currentIdx = routes.findIndex(r => r.id === hoveredRouteId);
-                  const nextIdx = (currentIdx + 1) % routes.length;
-                  useTreasureStore.getState().setHoveredRoute(routes[nextIdx].id);
-                }}
-              >
-                🔄 別のルートを見る
-              </button>
+            {/* ルート切替ボタン */}
+            <button
+              onClick={() => {
+                const routes = routeInfos.filter(r => r.landingNodeId === routePopupNodeId);
+                const currentIdx = routes.findIndex(r => r.id === hoveredRouteId);
+                const nextIdx = (currentIdx + 1) % routes.length;
+                useTreasureStore.getState().setHoveredRoute(routes[nextIdx].id);
+              }}
+              style={{
+                background: 'var(--surface2)',
+                border: '1px solid var(--border)',
+                borderRadius: '50%',
+                width: 40,
+                height: 40,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 18
+              }}
+            >
+              🔄
+            </button>
 
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  if (hoveredRouteId) {
-                    useTreasureStore.getState().selectRoute(hoveredRouteId);
-                  }
-                  setRoutePopupNodeId(null);
-                }}
-              >
-                ✨ このルートで決定！
-              </button>
+            {/* 決定ボタン */}
+            <button
+              onClick={() => {
+                if (hoveredRouteId) {
+                  useTreasureStore.getState().selectRoute(hoveredRouteId);
+                }
+                setRoutePopupNodeId(null);
+              }}
+              style={{
+                background: 'var(--accent)',
+                border: 'none',
+                borderRadius: '50%',
+                width: 48,
+                height: 48,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 22,
+                color: 'white',
+                boxShadow: '0 2px 12px rgba(233, 69, 96, 0.6)'
+              }}
+            >
+              ✨
+            </button>
 
-              <button
-                className="btn btn-secondary btn-sm"
-                style={{ marginTop: 4, background: 'transparent', border: 'none' }}
-                onClick={() => setRoutePopupNodeId(null)}
-              >
-                キャンセル
-              </button>
-            </div>
+            {/* キャンセルボタン */}
+            <button
+              onClick={() => setRoutePopupNodeId(null)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                width: 32,
+                height: 32,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 14,
+                opacity: 0.6
+              }}
+            >
+              ❌
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
