@@ -20,7 +20,7 @@ let logIdCounter = 0;
 export function TreasureGameLog({ isMobile }: { isMobile?: boolean }) {
     const { players, currentPlayerIndex, phase, currentMiningResult, currentStealBattle, currentCardResult } = useTreasureStore();
     const [logs, setLogs] = useState<GameLogEntry[]>([]);
-    const [isOpen, setIsOpen] = useState(true);
+    const [isOpen, setIsOpen] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const prevPhaseRef = useRef(phase);
 
