@@ -249,12 +249,14 @@ export function TreasureBoard({ isMobile }: { isMobile?: boolean }) {
                     <g
                       key={node.id}
                       onMouseEnter={(e) => {
+                        if (isMobile) return;
                         if (isSelectableLanding && selectableRoutes.length > 0) {
                           const route = getRouteByMouseAngle(e, selectableRoutes, map, node);
                           useTreasureStore.getState().setHoveredRoute(route.id);
                         }
                       }}
                       onMouseMove={(e) => {
+                        if (isMobile) return;
                         if (isSelectableLanding && selectableRoutes.length > 1) {
                           const route = getRouteByMouseAngle(e, selectableRoutes, map, node);
                           if (route.id !== useTreasureStore.getState().hoveredRouteId) {
@@ -263,6 +265,7 @@ export function TreasureBoard({ isMobile }: { isMobile?: boolean }) {
                         }
                       }}
                       onMouseLeave={() => {
+                        if (isMobile) return;
                         if (isSelectableLanding) {
                           useTreasureStore.getState().setHoveredRoute(null);
                         }
@@ -670,8 +673,15 @@ export function TreasureBoard({ isMobile }: { isMobile?: boolean }) {
             {/* 決定ボタン */}
             <button
               onClick={() => {
-                if (hoveredRouteId) {
-                  useTreasureStore.getState().selectRoute(hoveredRouteId);
+                const latestHovered = useTreasureStore.getState().hoveredRouteId;
+                if (latestHovered) {
+                  useTreasureStore.getState().selectRoute(latestHovered);
+                } else {
+                  // フォールバック: もしホバー状態が消えてもデフォルトで最初のルートを選ぶ
+                  const routes = routeInfos.filter(r => r.landingNodeId === routePopupNodeId);
+                  if (routes.length > 0) {
+                    useTreasureStore.getState().selectRoute(routes[0].id);
+                  }
                 }
                 setRoutePopupNodeId(null);
               }}
