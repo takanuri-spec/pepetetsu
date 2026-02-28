@@ -54,7 +54,7 @@ export function TreasureMobileUI() {
             </div>
 
             {/* 各プレイヤーステータス (サイコロの上) */}
-            <div style={{ display: 'flex', overflowX: 'auto', padding: '8px', gap: '8px', background: 'rgba(22, 33, 62, 0.8)', borderTop: '1px solid var(--border)', zIndex: 10 }}>
+            <div style={{ display: 'flex', padding: '8px', gap: '6px', background: 'rgba(22, 33, 62, 0.8)', borderTop: '1px solid var(--border)', zIndex: 10 }}>
                 {players.map((player) => {
                     const isCurrent = player.id === players[currentPlayerIndex]?.id;
                     const hasCards = player.cards.filter(c => !c.isPassive).length > 0;
@@ -72,27 +72,29 @@ export function TreasureMobileUI() {
                                 }
                             }}
                             style={{
-                                flex: '0 0 auto',
-                                width: '120px',
-                                padding: '6px 8px',
+                                flex: 1,
+                                minWidth: 0,
+                                padding: '6px',
                                 borderRadius: '8px',
                                 background: isCurrent ? 'var(--surface2)' : 'rgba(0,0,0,0.3)',
                                 border: isCurrent ? `2px solid ${COLOR_HEX[player.color]}` : '1px solid var(--border)',
                                 cursor: isClickable ? 'pointer' : 'default',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '4px'
+                                gap: '2px'
                             }}
                         >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '13px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: COLOR_HEX[player.color] }} />
-                                {player.name}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '11px', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: COLOR_HEX[player.color], flexShrink: 0 }} />
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{player.name}</span>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
-                                <span>💎 {player.treasures}</span>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                💎 {player.treasures}
+                            </div>
+                            <div style={{ height: '14px', fontSize: '10px' }}>
                                 {player.cards.length > 0 && (
-                                    <span style={{ display: 'flex', gap: 2 }}>
-                                        {player.cards.slice(0, 3).map((_, i) => <span key={i} style={{ fontSize: '10px' }}>🃏</span>)}
+                                    <span style={{ display: 'flex', gap: 1 }}>
+                                        {player.cards.slice(0, 3).map((_, i) => <span key={i}>🃏</span>)}
                                         {player.cards.length > 3 && '+'}
                                     </span>
                                 )}

@@ -196,12 +196,12 @@ export function TreasureBoard({ isMobile }: { isMobile?: boolean }) {
                 <button className="btn btn-secondary btn-sm" onClick={() => resetTransform()}>リセット</button>
               </div>
             )}
-            <TransformComponent wrapperStyle={isMobile ? { width: 'max-content', height: 'max-content' } : { width: '100%', height: '100%' }} contentStyle={isMobile ? { width: 'max-content', height: 'max-content' } : { width: '100%', height: '100%' }}>
+            <TransformComponent wrapperStyle={isMobile ? { width: '100%', height: 'auto', minHeight: '100%' } : { width: '100%', height: '100%' }} contentStyle={isMobile ? { width: '100%', height: 'auto', minHeight: '100%' } : { width: '100%', height: '100%' }}>
               <svg
                 ref={svgRef}
                 viewBox={dynamicViewBox}
-                width={isMobile ? vbW : undefined}
-                height={isMobile ? vbH : undefined}
+                width={isMobile ? "100%" : undefined}
+                height={isMobile ? "auto" : undefined}
                 className="board-svg"
                 style={isMobile ? { display: 'block' } : { display: 'block', width: '100%', height: '100%' }}
               >
