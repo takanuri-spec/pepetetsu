@@ -72,6 +72,7 @@ const INITIAL_STATE: InitialStateSubset = {
     rollingDiceDisplay: null,
     pendingMovement: null,
     pendingStealTargetId: null,
+    toasts: [],
 };
 
 export const useTreasureStore = create<TreasureStoreState>((set, get) => ({

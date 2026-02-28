@@ -1,5 +1,6 @@
 import type { GameSettings, LobbyPlayer, GameMap } from './types';
-import type { TreasureGameState, TreasurePlayer, MiningRecord } from './treasureTypes';
+import type { TreasureGameState, TreasurePlayer, MiningRecord, GameToast } from './treasureTypes';
+import { COLOR_HEX } from './types';
 import { GAME_MAP } from './mapData';
 import { getTreasureMap } from './treasureMaps';
 import { PLAYER_COLORS } from './types';
@@ -12,7 +13,7 @@ import { calcAllRoutes, rollDice } from './engine';
 export function createInitialTreasureState(
     settings: GameSettings,
     lobbyPlayers: LobbyPlayer[]
-): Omit<TreasureGameState, 'phase' | 'isAnimating' | 'pendingMoves' | 'routeInfos' | 'hoveredRouteId' | 'isRollingDice' | 'rollingDiceDisplay' | 'currentMiningResult' | 'currentStealBattle' | 'currentCardResult'> {
+): Omit<TreasureGameState, 'phase' | 'isAnimating' | 'pendingMoves' | 'routeInfos' | 'hoveredRouteId' | 'isRollingDice' | 'rollingDiceDisplay' | 'currentMiningResult' | 'currentStealBattle' | 'currentCardResult' | 'toasts'> {
 
     // Enforce at least 4 players. If there's 1 human, add 3 CPUs.
     let finalPlayers = [...lobbyPlayers];
@@ -37,17 +38,39 @@ export function createInitialTreasureState(
     const allNodeIds = Object.keys(treasureMap.nodes).map(Number);
     const shuffledIds = [...allNodeIds].sort(() => Math.random() - 0.5);
 
-    const players: TreasurePlayer[] = finalPlayers.map((lp, index) => ({
-        id: `player_${index}`,
-        name: lp.name,
-        color: lp.color,
-        position: shuffledIds[index] ?? treasureMap.startNodeId,
-        isHuman: lp.isHuman,
-        lapsCompleted: 0,
-        treasures: 0,
-        cards: [],
-        activeEffects: [],
-    }));
+    const players: TreasurePlayer[] = finalPlayers.map((lp, index) => {
+        let cpuPersonality = undefined;
+        if (!lp.isHuman) {
+            // それぞれの指向にランダムな重みを振り、時に特化させるために累乗をかける
+            let w1 = Math.random();
+            let w2 = Math.random();
+            let w3 = Math.random();
+            const p = 1 + Math.random() * 2; // 1~3乗することで偏り（特化キャラ）を生む
+            w1 = Math.pow(w1, p);
+            w2 = Math.pow(w2, p);
+            w3 = Math.pow(w3, p);
+            const sum = w1 + w2 + w3 || 1;
+
+            cpuPersonality = {
+                cardLover: w1 / sum,
+                miner: w2 / sum,
+                stalker: w3 / sum
+            };
+        }
+
+        return {
+            id: `player_${index}`,
+            name: lp.name,
+            color: lp.color,
+            position: shuffledIds[index] ?? treasureMap.startNodeId,
+            isHuman: lp.isHuman,
+            lapsCompleted: 0,
+            treasures: 0,
+            cards: [],
+            activeEffects: [],
+            cpuPersonality,
+        };
+    });
 
     return {
         players,
@@ -64,6 +87,20 @@ export function createInitialTreasureState(
         pendingMovement: null,
         pendingStealTargetId: null,
     };
+}
+
+// ==========================================
+// Toast Queue Helpers
+// ==========================================
+
+/** トーストを追加し3秒後に自動削除する。 */
+function pushToast(set: any, _get: any, toast: Omit<GameToast, 'id'>) {
+    const toastId = `toast_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const newToast: GameToast = { ...toast, id: toastId };
+    set((s: TreasureGameState) => ({ toasts: [...s.toasts, newToast] }));
+    setTimeout(() => {
+        set((s: TreasureGameState) => ({ toasts: s.toasts.filter(t => t.id !== toastId) }));
+    }, 3000);
 }
 
 // ==========================================
@@ -333,6 +370,8 @@ function _handleIntermediateStop(set: any, get: any) {
             },
             phase: 'steal_result'
         });
+        // 振り止めなしで即座に解決する（確認クリック不要）
+        _resolveIntermediateSteal(set, get);
     } else {
         // Fallback
         if (s.pendingMovement) {
@@ -380,18 +419,16 @@ function _finishTreasureMovement(set: any, get: any, route: any) {
             },
             phase: 'steal_result'
         });
-        return; // Wait for user to acknowledge steal result
+        // 確認クリックなしで即座に解決する
+        _resolveLandingSteal(set, get);
+        return;
     }
 
-    // 3. If no steal, resolve Mining/Card
+    // 3. 略奕なしの場合、採掘/カードを解決
     const node = s.map.nodes[landingNodeId];
     if (node && node.type === 'bonus') {
-        // Card node
-        const newCard = getRandomCard();
-        set({
-            currentCardResult: { card: newCard },
-            phase: 'card_result'
-        });
+        // カードノード: エンジン内で即座に解決
+        _resolveCardResult(set, get);
         return;
     }
 
@@ -401,11 +438,9 @@ function _finishTreasureMovement(set: any, get: any, route: any) {
 
     const mineResult = performMining(landingNodeId, s.minedNodes, s.map);
     if (mineResult.type !== 'empty' && !isSealed) {
-        set({
-            currentMiningResult: { nodeId: landingNodeId, type: mineResult.type },
-            phase: 'mining_result'
-        });
-        return; // Wait for user to acknowledge mining result
+        // 採掘結果をエンジン内で即座に解決する
+        _resolveMiningResult(set, get, landingNodeId, mineResult.type);
+        return;
     }
 
     // End turn if nothing happened
@@ -422,16 +457,21 @@ export function _cpuTreasureTurn(set: any, get: any) {
 
     // CPUのカード使用判断（ターン開始時）
     const cpuPlayer = s.players[s.currentPlayerIndex];
+    const pCard = cpuPlayer.cpuPersonality?.cardLover ?? 0.33;
+    const cardChance = 0.1 + pCard * 0.7; // cardLoverが高いほどカードをバンバン使う
+
     const activeCards = cpuPlayer.cards.filter((c: import('./treasureTypes').Card) => !c.isPassive);
-    if (activeCards.length > 0 && Math.random() < 0.4) {
+    if (activeCards.length > 0 && Math.random() < cardChance) {
         const card = activeCards[Math.floor(Math.random() * activeCards.length)];
-        const opponents = s.players.filter((p: TreasurePlayer) => p.id !== cpuPlayer.id);
+
+        let opponents = s.players.filter((p: TreasurePlayer) => p.id !== cpuPlayer.id);
+        // 共通：トップをお宝数で特定し、最優先で妨害する
+        opponents = opponents.sort((a: TreasurePlayer, b: TreasurePlayer) => b.treasures - a.treasures);
+
         if (card.type === 'time_machine') {
             _useCard(set, get, card.id);
         } else if (opponents.length > 0) {
-            // お宝が一番多い相手を狙う
-            const bestTarget = [...opponents].sort((a: TreasurePlayer, b: TreasurePlayer) => b.treasures - a.treasures)[0];
-            _useCard(set, get, card.id, bestTarget.id);
+            _useCard(set, get, card.id, opponents[0].id);
         }
     }
 
@@ -461,36 +501,59 @@ export function _cpuTreasureTurn(set: any, get: any) {
                 let bestRoute = routeInfos[0];
                 let bestScore = -9999;
 
+                const pMiner = currentPlayer.cpuPersonality?.miner ?? 0.33;
+                const pStalker = currentPlayer.cpuPersonality?.stalker ?? 0.33;
+                const pCard = currentPlayer.cpuPersonality?.cardLover ?? 0.33;
+
+                // 共通：トップをお宝数で特定
+                const sortedOpponents = s2.players
+                    .filter((p: TreasurePlayer) => p.id !== currentPlayer.id)
+                    .sort((a: TreasurePlayer, b: TreasurePlayer) => b.treasures - a.treasures);
+                const topPlayer = sortedOpponents[0];
+
                 for (const r of routeInfos) {
                     let score = 0;
-
-                    // 1. landing on unmined node
-                    if (!s2.minedNodes[r.landingNodeId]) score += 10;
-
-                    // 2. adjacent to mined node (better mining chance)
                     const node = s2.map.nodes[r.landingNodeId];
-                    if (node) {
+
+                    // 1. 採掘への執着 (Miner)
+                    let miningScore = 0;
+                    if (!s2.minedNodes[r.landingNodeId] && node?.type === 'property') {
+                        miningScore += 10;
+                    }
+                    if (node && node.type === 'property') {
                         let adjMined = 0;
                         for (const nextId of node.next) {
                             if (s2.minedNodes[nextId]) adjMined++;
                         }
-                        score += adjMined * 2;
+                        miningScore += adjMined * 3;
+                    }
+                    score += miningScore * pMiner * 2.5;
+
+                    // 2. カード・アイテムへの執着 (CardLover)
+                    if (node?.type === 'bonus') {
+                        score += 20 * pCard * 2.0;
                     }
 
-                    // 3. evaluate stealing
+                    // 3. 略奪・他者への執着 (Stalker + 共通トップ狙い)
                     const pathSet = new Set(r.path);
+                    let stealScore = 0;
                     for (const p of s2.players) {
                         if (p.id === currentPlayer.id) continue;
                         if (p.treasures > 0) {
+                            // 共通：トップからの強奪は特に優先度が高い
+                            const isTargetTop = p.id === topPlayer?.id;
+                            const priorityMult = isTargetTop ? 2.5 : 1.0;
+
                             if (p.position === r.landingNodeId) {
-                                score += 15; // 60% chance to steal
+                                stealScore += 15 * priorityMult;
                             } else if (pathSet.has(p.position)) {
-                                score += 5; // 30% chance to steal (simplified logic)
+                                stealScore += 5 * priorityMult;
                             }
                         }
                     }
+                    score += stealScore * pStalker * 2.5;
 
-                    // small random noise to prevent getting stuck
+                    // ランダムな揺らぎ（同じスコアでスタックしないため）
                     score += Math.random() * 2;
 
                     if (score > bestScore) {
@@ -509,51 +572,137 @@ export function _cpuTreasureTurn(set: any, get: any) {
 }
 
 // ==========================================
-// Acknowledgements from Modals
+// Internal Result Resolvers（トースト應用 + 即座蓋様）
 // ==========================================
 
-export function _acknowledgeMining(set: any, get: any) {
+/**
+ * 採掘結果を解決しトーストを発行する。
+ * 旧: phase='mining_result' に置きユーザー待機 → 新: 即座に遷移＋トースト表示。
+ */
+function _resolveMiningResult(
+    set: any, get: any,
+    nodeId: number,
+    type: 'normal' | 'rare' | 'trap' | 'empty' | 'fail'
+) {
     const s = get();
-    if (s.phase !== 'mining_result' || !s.currentMiningResult) return;
-
     const player = s.players[s.currentPlayerIndex];
-    const res = s.currentMiningResult;
 
     let newScore = player.treasures;
-
-    if (res.type === 'normal') newScore += 1;
-    else if (res.type === 'rare') newScore += 2;
-    else if (res.type === 'trap') newScore = Math.max(0, newScore - 1);
+    if (type === 'normal') newScore += 1;
+    else if (type === 'rare') newScore += 2;
+    else if (type === 'trap') newScore = Math.max(0, newScore - 1);
 
     const minedNodes = { ...s.minedNodes };
-    minedNodes[res.nodeId] = { playerId: res.type === 'fail' ? null : player.id, type: res.type };
+    minedNodes[nodeId] = { playerId: type === 'fail' ? null : player.id, type };
 
     const players = s.players.map((p: TreasurePlayer) =>
         p.id === player.id ? { ...p, treasures: newScore } : p
     );
 
+    const emoji = type === 'normal' ? '💎' : type === 'rare' ? '🌟' : type === 'trap' ? '💣' : '🪨';
+    const title = type === 'normal' ? 'お宝発見！' : type === 'rare' ? 'レアなお宝！' : type === 'trap' ? '罠にかかった！' : '何も感じられず…';
+    const message = type === 'normal' ? `所持数 ${newScore}（1アップ）`
+        : type === 'rare' ? `所持数 ${newScore}（2アップ）`
+            : type === 'trap' ? (newScore < player.treasures ? `所持数 ${newScore}（1減）` : '元々お宝なし…')
+                : 'ハズレ！何も見つからなかった';
+    const playerColor = COLOR_HEX[player.color as import('./types').PlayerColor] ?? '#fff';
+
     set({
         players,
         minedNodes,
         currentMiningResult: null,
-        phase: 'playing'
+        phase: 'playing',
     });
+    pushToast(set, get, { category: 'mining', emoji, title: `${player.name} — ${title}`, message, playerColor });
+    advanceTreasureTurn(set, get);
+}
+
+/**
+ * カード取得結果を解決しトーストを発行する。
+ */
+function _resolveCardResult(set: any, get: any) {
+    const s = get();
+    const player = s.players[s.currentPlayerIndex];
+    const card = getRandomCard();
+
+    const players = s.players.map((p: TreasurePlayer) =>
+        p.id === player.id ? { ...p, cards: [...p.cards, card] } : p
+    );
+
+    set({
+        players,
+        currentCardResult: null,
+        phase: 'playing',
+    });
+    pushToast(set, get, {
+        category: 'card',
+        emoji: '🃏',
+        title: `${player.name} — カードゲット！`,
+        message: `${card.name}`,
+        playerColor: COLOR_HEX[player.color as import('./types').PlayerColor] ?? '#fff',
+    });
+    advanceTreasureTurn(set, get);
+}
+
+/**
+ * 略奕結果を解決しトーストを発行する（着地予定墓での第1当事者組）。
+ * pendingMovementがある場合は移動を再開する。
+ */
+function _resolveLandingSteal(set: any, get: any) {
+    const s = get();
+    const battle = s.currentStealBattle;
+    if (!battle) return;
+
+    const stealResult = _applyStealOutcome(set, get, battle);
+    pushStealToast(set, get, battle, stealResult);
+
+    // 同一ノード理複が終わった後は採掘の展開へ
+    const s2 = get();
+    const player = s2.players[s2.currentPlayerIndex];
+    const node = s2.map.nodes[player.position];
+    if (node && node.type === 'bonus') {
+        _resolveCardResult(set, get);
+        return;
+    }
+
+    const mineResult = performMining(player.position, s2.minedNodes, s2.map);
+    if (mineResult.type !== 'empty') {
+        _resolveMiningResult(set, get, player.position, mineResult.type);
+        return;
+    }
 
     advanceTreasureTurn(set, get);
 }
 
-export function _acknowledgeSteal(set: any, get: any) {
+/**
+ * 経由地照射の略奕結果を解決する。
+ * 結果後は pendingMovement で移動を再開する。
+ */
+function _resolveIntermediateSteal(set: any, get: any) {
     const s = get();
-    if (s.phase !== 'steal_result' || !s.currentStealBattle) return;
-
     const battle = s.currentStealBattle;
-    const players = [...s.players] as TreasurePlayer[];
+    if (!battle) return;
 
+    const stealResult = _applyStealOutcome(set, get, battle);
+    pushStealToast(set, get, battle, stealResult);
+
+    const s2 = get();
+    if (s2.pendingMovement) {
+        _executeMovementChunk(set, get, s2.pendingMovement.path, s2.pendingMovement.landingNodeId);
+    }
+}
+
+/** 結果をステートに反映し、更新後のplayersを返す。 */
+function _applyStealOutcome(
+    set: any, get: any,
+    battle: NonNullable<TreasureGameState['currentStealBattle']>
+): { success: boolean; isCounter: boolean; substituteUsed: boolean } {
+    const s = get();
+    const players = [...s.players] as TreasurePlayer[];
     const attackerIdx = players.findIndex(p => p.id === battle.attackerId);
     const targetIdx = players.findIndex(p => p.id === battle.targetId);
 
     if (battle.substituteUsed) {
-        // 身代わり人形を消費（最初の1枚だけ）
         const newCards = [...players[targetIdx].cards];
         const subIdx = newCards.findIndex(c => c.type === 'substitute');
         if (subIdx >= 0) newCards.splice(subIdx, 1);
@@ -567,57 +716,48 @@ export function _acknowledgeSteal(set: any, get: any) {
     }
 
     set({ players, currentStealBattle: null, phase: 'playing' });
-
-    if (s.pendingMovement) {
-        // Resume movement!
-        _executeMovementChunk(set, get, s.pendingMovement.path, s.pendingMovement.landingNodeId);
-        return;
-    }
-
-    // After stealing (same_node), we STILL need to resolve mining if we landed on an unmined node.
-    const player = s.players[s.currentPlayerIndex];
-    const node = s.map.nodes[player.position];
-    if (node && node.type === 'bonus') {
-        // Card node
-        const newCard = getRandomCard();
-        set({
-            currentCardResult: { card: newCard },
-            phase: 'card_result'
-        });
-        return;
-    }
-
-    const mineResult = performMining(player.position, s.minedNodes, s.map);
-    if (mineResult.type !== 'empty') {
-        set({
-            currentMiningResult: { nodeId: player.position, type: mineResult.type },
-            phase: 'mining_result'
-        });
-        return;
-    }
-
-    advanceTreasureTurn(set, get);
+    return { success: battle.success, isCounter: battle.isCounter, substituteUsed: battle.substituteUsed };
 }
 
-export function _acknowledgeCard(set: any, get: any) {
+/** 略奕結果に応じたトーストを発行する。 */
+function pushStealToast(
+    set: any, get: any,
+    battle: NonNullable<TreasureGameState['currentStealBattle']>,
+    result: { success: boolean; isCounter: boolean; substituteUsed: boolean }
+) {
     const s = get();
-    if (s.phase !== 'card_result' || !s.currentCardResult) return;
+    const attacker = s.players.find((p: TreasurePlayer) => p.id === battle.attackerId);
+    const target = s.players.find((p: TreasurePlayer) => p.id === battle.targetId);
+    if (!attacker || !target) return;
 
-    const player = s.players[s.currentPlayerIndex];
-    const card = s.currentCardResult.card;
+    let emoji: string;
+    let title: string;
+    let message: string;
 
-    const players = s.players.map((p: import('./treasureTypes').TreasurePlayer) =>
-        p.id === player.id ? { ...p, cards: [...p.cards, card] } : p
-    );
+    if (result.substituteUsed) {
+        emoji = '🧸'; title = '身代わり人形為活！';
+        message = `${target.name}の身代わり人形が略奕を防いだ！`;
+    } else if (result.success) {
+        emoji = '⚔️'; title = `${attacker.name} — 略奕成功！`;
+        message = `${target.name}からお宝を１つ屢った！`;
+    } else if (result.isCounter) {
+        emoji = '🛡️'; title = `${attacker.name} — 返り讨ち！`;
+        message = `${target.name}に反撃された！`;
+    } else {
+        emoji = '💨'; title = `${attacker.name} — 略奕失敗`;
+        message = '繰を保った...';
+    }
 
-    set({
-        players,
-        currentCardResult: null,
-        phase: 'playing'
-    });
-
-    advanceTreasureTurn(set, get);
+    pushToast(set, get, { category: 'steal', emoji, title, message, playerColor: COLOR_HEX[attacker.color as import('./types').PlayerColor] ?? '#fff' });
 }
+
+// 以下はストアから呼ばれるスタブ。
+// ユーザーの確認クリックを待たずエンジン内部で即座に解決するようにしたため、
+// これらの関数は現在未使用だが将来の履歴表示など向けに外部履歴として履歴をそのまま公開する。
+
+export function _acknowledgeMining(_set: any, _get: any) { /* no-op: engine resolves immediately */ }
+export function _acknowledgeSteal(_set: any, _get: any) { /* no-op: engine resolves immediately */ }
+export function _acknowledgeCard(_set: any, _get: any) { /* no-op: engine resolves immediately */ }
 
 function getRandomCard(): import('./treasureTypes').Card {
     const types: import('./treasureTypes').CardType[] = ['power_up', 'substitute', 'seal', 'blow_away', 'paralysis', 'time_machine'];

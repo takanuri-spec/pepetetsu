@@ -30,6 +30,19 @@ export interface MiningRecord {
     type: 'normal' | 'rare' | 'trap' | 'fail';
 }
 
+// ========== Toast Notification ==========
+
+export type ToastCategory = 'mining' | 'steal' | 'card';
+
+export interface GameToast {
+    id: string;            // 重複防止用ユニークID
+    category: ToastCategory;
+    emoji: string;
+    title: string;
+    message: string;
+    playerColor: string;   // CSS色文字列（強調表示用）
+}
+
 // ========== State Interfaces ==========
 
 export interface TreasurePlayer {
@@ -44,6 +57,13 @@ export interface TreasurePlayer {
     treasures: number;
     cards: Card[];
     activeEffects: ActiveEffect[];
+
+    // CPU Behavior Weights (for AI)
+    cpuPersonality?: {
+        cardLover: number;  // アイテム集めて使うのが好き
+        miner: number;      // 採掘好き
+        stalker: number;    // 宝保持者を付け狙うのが好き
+    };
 }
 
 export type TreasureGamePhase =
@@ -91,4 +111,7 @@ export interface TreasureGameState {
     isAnimating: boolean;
     pendingMovement: { path: number[], landingNodeId: number } | null;
     pendingStealTargetId: string | null;
+
+    // スマホ通知スタイルのトーストキュー（確認クリック不要）
+    toasts: GameToast[];
 }

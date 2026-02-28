@@ -1,12 +1,62 @@
+import { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import type { LobbyPlayer } from '../../game/types';
 import { PLAYER_COLORS, COLOR_LABELS, COLOR_HEX } from '../../game/types';
 import { TREASURE_MAPS } from '../../game/treasureMaps';
+import { ManualModal } from '../ManualModal/ManualModal';
+import './Lobby.css';
 
-const DICE_EMOJI = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+// ========== デフォルトプレイヤー名候補（どうぶつ・のりもの・たべもの）==========
+const DEFAULT_NAMES = [
+  'ライオン', 'パンダ', 'ペンギン', 'キリン', 'ゾウ',
+  'うさぎ', 'ねこ', 'いぬ', 'たぬき', 'きつね',
+  'こあら', 'かば', 'かめ', 'とら', 'おさる',
+  'しんかんせん', 'バス', 'ロケット', 'ひこうき', 'ヘリコプター',
+  'バイク', 'トラック', 'ボート', 'せんすいかん', 'UFO',
+  'カレー', 'ラーメン', 'すし', 'ピザ', 'たこやき',
+];
 
+function randomDefaultName(used: string[]): string {
+  const remaining = DEFAULT_NAMES.filter(n => !used.includes(n));
+  if (remaining.length === 0) return 'プレイヤー';
+  return remaining[Math.floor(Math.random() * remaining.length)];
+}
+
+// ========== Segment Control コンポーネント ==========
+interface SegmentOption<T> {
+  label: string;
+  value: T;
+}
+
+function SegmentControl<T extends string | number>({
+  options,
+  value,
+  onChange,
+}: {
+  options: SegmentOption<T>[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="segment-control">
+      {options.map(opt => (
+        <button
+          key={String(opt.value)}
+          className={`segment-btn ${value === opt.value ? 'segment-btn--active' : ''}`}
+          onClick={() => onChange(opt.value)}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ========== ロビー本体 ==========
 export function Lobby() {
   const state = useGameStore();
+  const [isManualOpen, setIsManualOpen] = useState(false);
+
   if (state.phase !== 'lobby') return null;
 
   const { settings, lobbyPlayers, updateSettings, updateLobbyPlayers, startGame } = state;
@@ -16,175 +66,214 @@ export function Lobby() {
     updateLobbyPlayers(updated);
   }
 
+  function randomizeName(index: number) {
+    const usedNames = lobbyPlayers.map((p, i) => i !== index ? p.name : '').filter(Boolean);
+    updatePlayer(index, { name: randomDefaultName(usedNames) });
+  }
+
   const canStart = lobbyPlayers.length >= 2 && lobbyPlayers.length <= 4;
+  const isTreasure = settings.gameMode === 'treasure';
 
   return (
-    <div className="lobby">
-      <div>
-        <h1 className="lobby-title">{DICE_EMOJI[1]}{DICE_EMOJI[3]}{DICE_EMOJI[5]} ペペ鉄</h1>
-        <p className="lobby-subtitle">テーマ生成型ボードゲームエンジン — Phase 1</p>
-      </div>
+    <div className="lobby-screen">
+      {/* 背景画像 */}
+      <div className="lobby-bg" />
 
-      {/* Players */}
-      <div className="lobby-card">
-        <h2>プレイヤー設定</h2>
-        {lobbyPlayers.map((player, index) => (
-          <div className="lobby-player-row" key={index}>
-            <input
-              className="lobby-input"
-              value={player.name}
-              onChange={e => updatePlayer(index, { name: e.target.value })}
-              placeholder={`プレイヤー${index + 1}`}
-              maxLength={12}
-            />
-            <select
-              className="lobby-select"
-              value={player.isHuman ? 'human' : 'cpu'}
-              onChange={e => updatePlayer(index, { isHuman: e.target.value === 'human' })}
-            >
-              <option value="human">人間</option>
-              <option value="cpu">CPU</option>
-            </select>
-            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-              {PLAYER_COLORS.map(color => (
-                <button
-                  key={color}
-                  onClick={() => updatePlayer(index, { color })}
-                  style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: '50%',
-                    background: COLOR_HEX[color],
-                    border: player.color === color ? '2px solid white' : '2px solid transparent',
-                    padding: 0,
-                    cursor: lobbyPlayers.some((p, i) => i !== index && p.color === color)
-                      ? 'not-allowed' : 'pointer',
-                    opacity: lobbyPlayers.some((p, i) => i !== index && p.color === color) ? 0.3 : 1,
-                  }}
-                  disabled={lobbyPlayers.some((p, i) => i !== index && p.color === color)}
-                  title={COLOR_LABELS[color]}
-                />
+      {/* タイトルロゴ */}
+      <header className="lobby-header">
+        <div className="lobby-logo-wrap">
+          <span className="lobby-logo-dice">🎲</span>
+          <h1 className="lobby-logo-title">ペペテツ</h1>
+          <span className="lobby-logo-dice">🎲</span>
+        </div>
+        <button className="lobby-manual-btn" onClick={() => setIsManualOpen(true)}>
+          📖 あそびかた
+        </button>
+      </header>
+
+      {/* メインコンテンツ */}
+      <div className="lobby-main">
+
+        {/* 左ペイン：モード選択 */}
+        <div className="lobby-modes">
+          <button
+            className={`mode-card ${settings.gameMode === 'classic' ? 'mode-card--active' : ''}`}
+            onClick={() => updateSettings({ gameMode: 'classic' })}
+          >
+            <img src="/mode_classic.png" alt="マップすごろく" className="mode-card-img" />
+            {settings.gameMode === 'classic' && <div className="mode-card-check">✔</div>}
+          </button>
+
+          <button
+            className={`mode-card ${isTreasure ? 'mode-card--active' : ''}`}
+            onClick={() => updateSettings({ gameMode: 'treasure' })}
+          >
+            <img src="/mode_treasure.png" alt="トレジャーハント" className="mode-card-img" />
+            {isTreasure && <div className="mode-card-check">✔</div>}
+          </button>
+        </div>
+
+        {/* 右ペイン：設定 */}
+        <div className="lobby-settings-pane">
+
+          {/* スタートボタン */}
+          <button
+            className="start-btn"
+            onClick={startGame}
+            disabled={!canStart}
+          >
+            ⚡ ゲームスタート！
+          </button>
+
+          {/* ゲーム設定 */}
+          <div className="lobby-panel">
+            <p className="lobby-pane-label">⚙ ゲーム設定</p>
+
+            {/* クラシック設定 */}
+            {settings.gameMode === 'classic' && (
+              <>
+                <div className="setting-row">
+                  <span className="setting-label">🗓 総ラウンド数</span>
+                  <SegmentControl
+                    options={[
+                      { label: '12（短）', value: 12 },
+                      { label: '20（標準）', value: 20 },
+                      { label: '30（長）', value: 30 },
+                    ]}
+                    value={settings.totalRounds}
+                    onChange={v => updateSettings({ totalRounds: v })}
+                  />
+                </div>
+                <div className="setting-row">
+                  <span className="setting-label">💰 初期所持金</span>
+                  <SegmentControl
+                    options={[
+                      { label: '800（厳）', value: 800 },
+                      { label: '1000（標）', value: 1000 },
+                      { label: '1500（楽）', value: 1500 },
+                    ]}
+                    value={settings.startingMoney}
+                    onChange={v => updateSettings({ startingMoney: v })}
+                  />
+                </div>
+                <div className="setting-row">
+                  <span className="setting-label">🔄 決算サイクル</span>
+                  <SegmentControl
+                    options={[
+                      { label: '3R', value: 3 },
+                      { label: '4R', value: 4 },
+                      { label: '5R', value: 5 },
+                    ]}
+                    value={settings.cycleLength}
+                    onChange={v => updateSettings({ cycleLength: v })}
+                  />
+                </div>
+                <div className="setting-row">
+                  <span className="setting-label">🎯 目的地ボーナス</span>
+                  <SegmentControl
+                    options={[
+                      { label: '300', value: 300 },
+                      { label: '500', value: 500 },
+                      { label: '800', value: 800 },
+                    ]}
+                    value={settings.destinationBonusAmount}
+                    onChange={v => updateSettings({ destinationBonusAmount: v })}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* トレジャー設定 */}
+            {isTreasure && (
+              <>
+                <div className="setting-row">
+                  <span className="setting-label">🗺 マップ</span>
+                  <div className="map-selector">
+                    {TREASURE_MAPS.map(m => (
+                      <button
+                        key={m.id}
+                        className={`map-btn ${settings.treasureMapId === m.id ? 'map-btn--active' : ''}`}
+                        onClick={() => updateSettings({ treasureMapId: m.id })}
+                        title={m.description}
+                      >
+                        <span>{m.emoji}</span>
+                        <span>{m.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="setting-row">
+                  <span className="setting-label">💎 目標お宝数</span>
+                  <SegmentControl
+                    options={[
+                      { label: '5個', value: 5 },
+                      { label: '10個', value: 10 },
+                      { label: '15個', value: 15 },
+                      { label: '20個', value: 20 },
+                    ]}
+                    value={settings.targetTreasures ?? 10}
+                    onChange={v => updateSettings({ targetTreasures: v })}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* プレイヤー設定 */}
+          <div className="lobby-panel">
+            <p className="lobby-pane-label">👥 プレイヤー設定</p>
+            <div className="player-list">
+              {lobbyPlayers.map((player, index) => (
+                <div className="player-row" key={index}>
+                  {/* 色選択 */}
+                  <div className="color-dots">
+                    {PLAYER_COLORS.map(color => {
+                      const usedByOther = lobbyPlayers.some((p, i) => i !== index && p.color === color);
+                      return (
+                        <button
+                          key={color}
+                          className={`color-dot ${player.color === color ? 'color-dot--active' : ''}`}
+                          style={{ background: COLOR_HEX[color], opacity: usedByOther ? 0.2 : 1 }}
+                          disabled={usedByOther}
+                          onClick={() => updatePlayer(index, { color })}
+                          title={COLOR_LABELS[color]}
+                        />
+                      );
+                    })}
+                  </div>
+
+                  {/* 名前入力 */}
+                  <div className="player-name-wrap">
+                    <input
+                      className="player-input"
+                      value={player.name}
+                      onChange={e => updatePlayer(index, { name: e.target.value })}
+                      maxLength={12}
+                    />
+                    <button
+                      className="name-random-btn"
+                      onClick={() => randomizeName(index)}
+                      title="ランダムな名前にする"
+                    >🎲</button>
+                  </div>
+
+                  {/* 人間/CPU */}
+                  <SegmentControl
+                    options={[
+                      { label: '👤', value: 'human' },
+                      { label: '🤖', value: 'cpu' },
+                    ]}
+                    value={player.isHuman ? 'human' : 'cpu'}
+                    onChange={v => updatePlayer(index, { isHuman: v === 'human' })}
+                  />
+                </div>
               ))}
             </div>
           </div>
-        ))}
-      </div>
-
-      {/* Game Settings */}
-      <div className="lobby-card">
-        <h2>ゲーム設定</h2>
-        <div className="lobby-settings-grid">
-          <div className="lobby-settings-item" style={{ gridColumn: '1 / -1' }}>
-            <label>ゲームモード</label>
-            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-              <button
-                className={`btn ${settings.gameMode === 'classic' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => updateSettings({ gameMode: 'classic' })}
-                style={{ flex: 1 }}
-              >
-                🏢 物件・資産（クラシック）
-              </button>
-              <button
-                className={`btn ${settings.gameMode === 'treasure' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => updateSettings({ gameMode: 'treasure' })}
-                style={{ flex: 1 }}
-              >
-                🏴‍☠️ お宝争奪戦（新モード）
-              </button>
-            </div>
-          </div>
-          {settings.gameMode === 'classic' && (
-            <>
-              <div className="lobby-settings-item">
-                <label>総ラウンド数</label>
-                <select
-                  className="lobby-select"
-                  value={settings.totalRounds}
-                  onChange={e => updateSettings({ totalRounds: Number(e.target.value) })}
-                >
-                  <option value={12}>12（短い）</option>
-                  <option value={20}>20（標準）</option>
-                  <option value={30}>30（長い）</option>
-                </select>
-              </div>
-              <div className="lobby-settings-item">
-                <label>決算サイクル</label>
-                <select
-                  className="lobby-select"
-                  value={settings.cycleLength}
-                  onChange={e => updateSettings({ cycleLength: Number(e.target.value) })}
-                >
-                  <option value={4}>4ラウンドごと</option>
-                  <option value={3}>3ラウンドごと</option>
-                  <option value={5}>5ラウンドごと</option>
-                </select>
-              </div>
-              <div className="lobby-settings-item">
-                <label>初期所持金</label>
-                <select
-                  className="lobby-select"
-                  value={settings.startingMoney}
-                  onChange={e => updateSettings({ startingMoney: Number(e.target.value) })}
-                >
-                  <option value={800}>800（厳しめ）</option>
-                  <option value={1000}>1000（標準）</option>
-                  <option value={1500}>1500（ゆとり）</option>
-                </select>
-              </div>
-              <div className="lobby-settings-item">
-                <label>目的地ボーナス</label>
-                <select
-                  className="lobby-select"
-                  value={settings.destinationBonusAmount}
-                  onChange={e => updateSettings({ destinationBonusAmount: Number(e.target.value) })}
-                >
-                  <option value={300}>300（少なめ）</option>
-                  <option value={500}>500（標準）</option>
-                  <option value={800}>800（大きめ）</option>
-                </select>
-              </div>
-            </>
-          )}
-
-          {settings.gameMode === 'treasure' && (
-            <>
-              <div className="lobby-settings-item">
-                <label>マップ選択</label>
-                <select
-                  className="lobby-select"
-                  value={settings.treasureMapId}
-                  onChange={e => updateSettings({ treasureMapId: e.target.value })}
-                >
-                  {TREASURE_MAPS.map(m => (
-                    <option key={m.id} value={m.id}>{m.emoji} {m.name}</option>
-                  ))}
-                </select>
-                <div style={{ fontSize: '0.85rem', color: '#aaa', marginTop: 4 }}>
-                  {TREASURE_MAPS.find(m => m.id === settings.treasureMapId)?.description}
-                </div>
-              </div>
-              <div className="lobby-settings-item">
-                <label>目標お宝個数</label>
-                <select
-                  className="lobby-select"
-                  value={settings.targetTreasures}
-                  onChange={e => updateSettings({ targetTreasures: Number(e.target.value) })}
-                >
-                  <option value={5}>5個（短い）</option>
-                  <option value={10}>10個（標準）</option>
-                  <option value={15}>15個（長い）</option>
-                  <option value={20}>20個（激闘）</option>
-                  <option value={999}>上限なし（全マス掘り尽くすまで）</option>
-                </select>
-              </div>
-            </>
-          )}
         </div>
       </div>
 
-      <button className="btn btn-primary" onClick={startGame} disabled={!canStart}>
-        ゲームスタート
-      </button>
+      <ManualModal isOpen={isManualOpen} onClose={() => setIsManualOpen(false)} />
     </div>
   );
 }

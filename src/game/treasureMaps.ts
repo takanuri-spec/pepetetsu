@@ -240,11 +240,12 @@ function buildRingOfFire(): GameMap {
         const current = clusters[i];
         const next = clusters[(i + 1) % 6];
 
-        // 各クラスターの最寄りのノード同士を接続
-        // current の「次のクラスター方向寄り」のノード → next の「前のクラスター方向寄り」のノード
-        const angle = ((i + 0.5) / 6) * Math.PI * 2 - Math.PI / 2;
-        const currentEdgeIdx = getBestEdgeNode(current.nodes, angle);
-        const nextEdgeIdx = getBestEdgeNode(next.nodes, angle + Math.PI);
+        // 2クラスター間の中間点を基準に、物理的に最も近い端ノードをそれぞれ選ぶ。
+        // 角度ベースの内積スコアは六角形の斜め辺で誤選択を起こすため距離ベースに変更。
+        const midX = (current.nodes[4].x + next.nodes[4].x) / 2; // 各クラスター中心の中点
+        const midY = (current.nodes[4].y + next.nodes[4].y) / 2;
+        const currentEdgeIdx = getBestEdgeNode(current.nodes, midX, midY);
+        const nextEdgeIdx = getBestEdgeNode(next.nodes, midX, midY);
 
         const corridor = createCorridor(
             current.nodes[currentEdgeIdx],
@@ -261,22 +262,20 @@ function buildRingOfFire(): GameMap {
 }
 
 /**
- * クラスター内で指定の角度方向に最も近いノードのインデックスを返す
+ * クラスター内で指定の「目標点」に最も近いノードのインデックスを返す。
+ * 角度ベースの内積スコアは斜め配置のクラスターで視覚的に遠いノードを選びがちなため、
+ * 実際の座標距離で判定することで線の交差・重複を防ぐ。
  */
-function getBestEdgeNode(nodes: MapNode[], targetAngle: number): number {
-    const cx = nodes.reduce((sum, n) => sum + n.x, 0) / nodes.length;
-    const cy = nodes.reduce((sum, n) => sum + n.y, 0) / nodes.length;
-
+function getBestEdgeNode(nodes: MapNode[], targetX: number, targetY: number): number {
     let bestIdx = 0;
-    let bestScore = -Infinity;
+    let bestDist = Infinity;
 
     nodes.forEach((n, i) => {
-        // 目標角度方向へのスコア（内積ベース）
-        const dx = n.x - cx;
-        const dy = n.y - cy;
-        const score = dx * Math.cos(targetAngle) + dy * Math.sin(targetAngle);
-        if (score > bestScore) {
-            bestScore = score;
+        const dx = n.x - targetX;
+        const dy = n.y - targetY;
+        const dist = dx * dx + dy * dy; // sqrt不要（比較のみ）
+        if (dist < bestDist) {
+            bestDist = dist;
             bestIdx = i;
         }
     });

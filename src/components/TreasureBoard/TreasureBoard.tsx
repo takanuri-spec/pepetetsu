@@ -50,6 +50,61 @@ const CARD_EMOJI: Record<string, string> = {
   'time_machine': '⌚',
 };
 
+// マウス座標の角度をもとに、直前ノードから対象ノードへ向かうルートの中で最も近いものを選択する
+const getRouteByMouseAngle = (e: React.MouseEvent<SVGGElement>, routes: any[], currentMap: any, targetNode: any) => {
+  if (routes.length <= 1) return routes[0];
+
+  let centerX = 0;
+  let centerY = 0;
+
+  // テキスト等に引っ張られる getBoundingClientRect() のズレを回避し、
+  // ノードの真の中心座標(targetNode.x, targetNode.y)の画面上での位置を逆算する
+  const svgGroup = e.currentTarget;
+  const svgElement = svgGroup.ownerSVGElement;
+
+  if (svgElement) {
+    const pt = svgElement.createSVGPoint();
+    pt.x = targetNode.x;
+    pt.y = targetNode.y;
+    const ctm = svgGroup.getScreenCTM();
+    if (ctm) {
+      const screenPt = pt.matrixTransform(ctm);
+      centerX = screenPt.x;
+      centerY = screenPt.y;
+    }
+  }
+
+  // 万が一取得失敗した場合はgetBoundingClientRect（下方向にズレる）をフォールバックに
+  if (centerX === 0 && centerY === 0) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    centerX = rect.left + rect.width / 2;
+    centerY = rect.top + rect.height / 2;
+  }
+
+  const dx = e.clientX - centerX;
+  const dy = e.clientY - centerY;
+  const mouseAngle = Math.atan2(dy, dx);
+
+  let bestRoute = routes[0];
+  let minDiff = Infinity;
+
+  for (const r of routes) {
+    const pNodeId = r.path.length >= 2 ? r.path[r.path.length - 2] : r.path[0];
+    const pNode = currentMap.nodes[pNodeId] || targetNode;
+    // 対象ノードから直前ノードへの角度を求めて、マウスの角度と比較
+    const rAngle = Math.atan2(pNode.y - targetNode.y, pNode.x - targetNode.x);
+
+    let diff = Math.abs(rAngle - mouseAngle);
+    if (diff > Math.PI) diff = 2 * Math.PI - diff;
+
+    if (diff < minDiff) {
+      minDiff = diff;
+      bestRoute = r;
+    }
+  }
+  return bestRoute;
+};
+
 export function TreasureBoard() {
   const state = useTreasureStore();
   const { players, currentPlayerIndex, map, movingPath, isAnimating, routeInfos, hoveredRouteId, minedNodes, phase } = state;
@@ -190,9 +245,18 @@ export function TreasureBoard() {
                   return (
                     <g
                       key={node.id}
-                      onMouseEnter={() => {
+                      onMouseEnter={(e) => {
                         if (isSelectableLanding && selectableRoutes.length > 0) {
-                          useTreasureStore.getState().setHoveredRoute(selectableRoutes[0].id);
+                          const route = getRouteByMouseAngle(e, selectableRoutes, map, node);
+                          useTreasureStore.getState().setHoveredRoute(route.id);
+                        }
+                      }}
+                      onMouseMove={(e) => {
+                        if (isSelectableLanding && selectableRoutes.length > 1) {
+                          const route = getRouteByMouseAngle(e, selectableRoutes, map, node);
+                          if (route.id !== useTreasureStore.getState().hoveredRouteId) {
+                            useTreasureStore.getState().setHoveredRoute(route.id);
+                          }
                         }
                       }}
                       onMouseLeave={() => {
@@ -204,11 +268,17 @@ export function TreasureBoard() {
                         if (phase === 'card_target_selection') {
                           useTreasureStore.getState().confirmCardNodeSelection(node.id);
                         } else if (isSelectableLanding && selectableRoutes.length > 0) {
-                          useTreasureStore.getState().selectRoute(selectableRoutes[0].id);
+                          const currentHoveredId = useTreasureStore.getState().hoveredRouteId;
+                          const targetRoute = selectableRoutes.find((r: any) => r.id === currentHoveredId) || selectableRoutes[0];
+                          useTreasureStore.getState().selectRoute(targetRoute.id);
                         }
                       }}
                       style={{ cursor: cursorStyle }}
                     >
+                      {/* 拡張当たり判定ゾーン (複数ルート時にカーソルをずらしやすくする) */}
+                      {isSelectableLanding && selectableRoutes.length > 1 && (
+                        <circle cx={node.x} cy={node.y} r={r + 26} fill="transparent" />
+                      )}
                       {isHighlighted && (
                         <circle cx={node.x} cy={node.y} r={r + 8} fill="white" opacity={0.3} />
                       )}
@@ -289,7 +359,10 @@ export function TreasureBoard() {
                       key={player.id}
                       animate={{ x: node.x + dx, y: node.y + dy }}
                       transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-                      style={{ cursor: isClickable ? 'pointer' : 'default' }}
+                      style={{
+                        cursor: isClickable ? 'pointer' : 'default',
+                        pointerEvents: isClickable ? 'auto' : 'none'
+                      }}
                       onClick={() => {
                         if (!isClickable) return;
                         setCardPopupPlayerId(prev => prev === player.id ? null : player.id);

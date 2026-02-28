@@ -154,23 +154,22 @@ export function calcAllRoutes(
     currentNodes = nextNodes;
   }
 
-  // 同一の着地地点（landingNodeId）が複数ある場合、重複を除去する
-  const uniqueLandingNodes = new Map<number, number>(); // landingNodeId -> pathIndex
-  currentNodes.forEach((nodeId, idx) => {
-    if (!uniqueLandingNodes.has(nodeId)) {
-      uniqueLandingNodes.set(nodeId, idx);
-    }
-  });
-
-  // RouteInfo の生成
+  // 同一着地点への複数ルートを全て保持する（重複除去しない）
+  // ただしパス自体が完全に同一なものは除去する
+  const seenPaths = new Set<string>();
   const result: RouteInfo[] = [];
-  uniqueLandingNodes.forEach((pathIdx, landingNodeId) => {
-    const path = paths[pathIdx];
+
+  currentNodes.forEach((landingNodeId, idx) => {
+    const path = paths[idx];
+    const pathKey = path.join(',');
+    if (seenPaths.has(pathKey)) return; // 完全に同じパスは除去
+    seenPaths.add(pathKey);
+
     const distToDestination = destinationNodeId != null
       ? calcDistanceToNode(landingNodeId, destinationNodeId, map)
       : null;
     result.push({
-      id: `route-${landingNodeId}`,
+      id: `route-${landingNodeId}-${idx}`, // 同一着地点でも別ルートとして一意IDを付与
       path,
       landingNodeId,
       distToDestination
