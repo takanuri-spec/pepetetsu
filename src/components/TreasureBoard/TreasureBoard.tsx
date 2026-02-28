@@ -107,13 +107,12 @@ const getRouteByMouseAngle = (e: React.MouseEvent<SVGGElement>, routes: any[], c
 
 export function TreasureBoard() {
   const state = useTreasureStore();
-  const { players, currentPlayerIndex, map, movingPath, isAnimating, routeInfos, hoveredRouteId, minedNodes, phase } = state;
+  const { players, currentPlayerIndex, map, movingPath, isAnimating, routeInfos, hoveredRouteId, minedNodes, phase, cardPopupPlayerId, selectedCardId, openCardPopup, closeCardPopup, setSelectedCardId } = state;
   const svgRef = useRef<SVGSVGElement>(null);
   const [currentMoveHighlight, setCurrentMoveHighlight] = useState<number | null>(null);
 
-  // 手札ポップアップ用 state
-  const [cardPopupPlayerId, setCardPopupPlayerId] = useState<string | null>(null);
-  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+  const cardPopupPlayer = players.find(p => p.id === cardPopupPlayerId) ?? null;
+  const selectedCard = cardPopupPlayer?.cards.find(c => c.id === selectedCardId) ?? null;
 
   useEffect(() => {
     if (isAnimating && movingPath.length > 0) {
@@ -164,14 +163,7 @@ export function TreasureBoard() {
   const vbH = Math.round(maxY - minY + padding * 2);
   const dynamicViewBox = `${vbX} ${vbY} ${vbW} ${vbH}`;
 
-  // 手札ポップアップを開いているプレイヤー
-  const cardPopupPlayer = players.find(p => p.id === cardPopupPlayerId) ?? null;
   const currentPlayer = players[currentPlayerIndex];
-
-  function closeCardPopup() {
-    setCardPopupPlayerId(null);
-    setSelectedCard(null);
-  }
 
   return (
     <>
@@ -361,12 +353,21 @@ export function TreasureBoard() {
                       transition={{ type: 'spring', stiffness: 200, damping: 20 }}
                       style={{
                         cursor: isClickable ? 'pointer' : 'default',
-                        pointerEvents: isClickable ? 'auto' : 'none'
+                        pointerEvents: isClickable ? 'all' : 'none'
                       }}
-                      onClick={() => {
+                      onPointerDown={(e) => {
                         if (!isClickable) return;
-                        setCardPopupPlayerId(prev => prev === player.id ? null : player.id);
-                        setSelectedCard(null);
+                        // Prevent map dragging if we touched the token
+                        e.stopPropagation();
+                      }}
+                      onClickCapture={(e) => {
+                        if (!isClickable) return;
+                        e.stopPropagation();
+                        if (cardPopupPlayerId === player.id) {
+                          closeCardPopup();
+                        } else {
+                          openCardPopup(player.id);
+                        }
                       }}
                     >
                       {/* クリック可能リング */}
@@ -489,7 +490,7 @@ export function TreasureBoard() {
                   }}
                   onClick={() => {
                     if (phase !== 'playing') return;
-                    setSelectedCard(prev => prev?.id === card.id ? null : card);
+                    setSelectedCardId(selectedCard?.id === card.id ? null : card.id);
                   }}
                 >
                   <span style={{ fontSize: 22 }}>{CARD_EMOJI[card.type] || '🃏'}</span>
@@ -541,7 +542,7 @@ export function TreasureBoard() {
                 <button
                   className="btn btn-secondary btn-sm"
                   style={{ width: '100%', marginTop: 6 }}
-                  onClick={() => setSelectedCard(null)}
+                  onClick={() => setSelectedCardId(null)}
                 >キャンセル</button>
               </div>
             )}
