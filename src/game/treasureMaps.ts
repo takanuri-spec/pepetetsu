@@ -289,8 +289,8 @@ function getBestEdgeNode(nodes: MapNode[], targetX: number, targetY: number): nu
 export const TREASURE_MAPS: TreasureMapDef[] = [
     {
         id: 'mobile_grid',
-        name: 'モバイル(6x10)',
-        description: 'スマホ向けに最適化された6x10の固定グリッドマップ',
+        name: 'ミニマム',
+        description: 'スマホ向けに最適化された6x9（中央空白）のミニマムマップ',
         emoji: '📱',
         build: buildMobileGridMap,
     },
