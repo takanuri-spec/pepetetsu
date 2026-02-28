@@ -114,6 +114,16 @@ export function TreasureBoard() {
   const cardPopupPlayer = players.find(p => p.id === cardPopupPlayerId) ?? null;
   const selectedCard = cardPopupPlayer?.cards.find(c => c.id === selectedCardId) ?? null;
 
+  // 複数ルート選択時の確認ポップアップ用
+  const [routePopupNodeId, setRoutePopupNodeId] = useState<number | null>(null);
+
+  useEffect(() => {
+    // フェーズが変わったらルート選択ポップアップは閉じる
+    if (phase !== 'route_selection') {
+      setRoutePopupNodeId(null);
+    }
+  }, [phase]);
+
   useEffect(() => {
     if (isAnimating && movingPath.length > 0) {
       movingPath.forEach((nodeId: number, i: number) => {
@@ -260,9 +270,24 @@ export function TreasureBoard() {
                         if (phase === 'card_target_selection') {
                           useTreasureStore.getState().confirmCardNodeSelection(node.id);
                         } else if (isSelectableLanding && selectableRoutes.length > 0) {
-                          const currentHoveredId = useTreasureStore.getState().hoveredRouteId;
-                          const targetRoute = selectableRoutes.find((r: any) => r.id === currentHoveredId) || selectableRoutes[0];
-                          useTreasureStore.getState().selectRoute(targetRoute.id);
+                          if (selectableRoutes.length === 1) {
+                            // 1ルートのみなら即決定
+                            useTreasureStore.getState().selectRoute(selectableRoutes[0].id);
+                            setRoutePopupNodeId(null);
+                          } else {
+                            // 複数ルートある場合
+                            const storeHoveredId = useTreasureStore.getState().hoveredRouteId;
+                            if (routePopupNodeId === node.id) {
+                              // 既にポップアップが開いている状態ならタップで次のルートに切り替える(トグル)
+                              const currentIdx = selectableRoutes.findIndex((r: any) => r.id === storeHoveredId);
+                              const nextIdx = (currentIdx + 1) % selectableRoutes.length;
+                              useTreasureStore.getState().setHoveredRoute(selectableRoutes[nextIdx].id);
+                            } else {
+                              // 初回タップ時：ポップアップを開き、最初のルートをハイライトする
+                              setRoutePopupNodeId(node.id);
+                              useTreasureStore.getState().setHoveredRoute(selectableRoutes[0].id);
+                            }
+                          }
                         }
                       }}
                       style={{ cursor: cursorStyle }}
@@ -560,6 +585,72 @@ export function TreasureBoard() {
                 >キャンセル</button>
               </div>
             )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 複数ルート選択時の確認ポップアップ（モバイル用対応） */}
+      <AnimatePresence>
+        {routePopupNodeId && phase === 'route_selection' && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            style={{
+              position: 'absolute',
+              bottom: 80,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 200,
+              background: 'var(--surface)',
+              border: `2px solid var(--accent)`,
+              borderRadius: 16,
+              padding: '16px 20px',
+              minWidth: 280,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+              textAlign: 'center'
+            }}
+          >
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>
+              🔄 複数のルートがあります！
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+              行き先のマスを何度かタップするか、下のボタンを押してルートを切り替えられます。
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  const routes = routeInfos.filter(r => r.landingNodeId === routePopupNodeId);
+                  const currentIdx = routes.findIndex(r => r.id === hoveredRouteId);
+                  const nextIdx = (currentIdx + 1) % routes.length;
+                  useTreasureStore.getState().setHoveredRoute(routes[nextIdx].id);
+                }}
+              >
+                🔄 別のルートを見る
+              </button>
+
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  if (hoveredRouteId) {
+                    useTreasureStore.getState().selectRoute(hoveredRouteId);
+                  }
+                  setRoutePopupNodeId(null);
+                }}
+              >
+                ✨ このルートで決定！
+              </button>
+
+              <button
+                className="btn btn-secondary btn-sm"
+                style={{ marginTop: 4, background: 'transparent', border: 'none' }}
+                onClick={() => setRoutePopupNodeId(null)}
+              >
+                キャンセル
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
